@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlpeStyle 74 — Vêtements de marque</title>
+<!-- Favicon SVG -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='6' fill='%231a1a18'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Georgia,serif' font-size='22' font-weight='bold' fill='%23fafaf8' letter-spacing='1'%3EA74%3C/text%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<!-- Leaflet pour la carte -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ════════════════════════════════════════════════════════
+// SUPABASE — configuration
+// ════════════════════════════════════════════════════════
+const SUPA_URL = 'https://ojjeidhesxrwxobcbntu.supabase.co';
+const SUPA_KEY = 'sb_publishable_vdawNztq6Zsz_C44_SWwYg_MfMakjPo';
+
+async function supaFetch(table, method='GET', body=null, params=''){
+  const url = `${SUPA_URL}/rest/v1/${table}${params}`;
+  const headers = {
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': method==='POST' ? 'return=representation' : 'return=minimal'
+  };
+  const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : null });
+  if(!res.ok){ const e=await res.text(); throw new Error(e); }
+  if(method==='GET') return res.json();
+  return res.status === 204 ? null : res.json();
+}
+
+// API unifiée
+async function dbGetAll(table){
+  try{ return await supaFetch(table,'GET',null,'?order=id.desc'); }
+  catch(e){ console.warn('Supabase read fail:',e); return []; }
+}
+async function dbPut(table, obj){
+  try{
+    // Upsert : insert ou update selon si id existe
+    await supaFetch(table,'POST', obj, '?on_conflict=id');
+  }catch(e){ console.warn('Supabase write fail:',e); }
+}
+async function dbDelete(table, id){
+  try{ await supaFetch(table,'DELETE',null,`?id=eq.${id}`); }
+  catch(e){ console.warn('Supabase delete fail:',e); }
+}
+async function dbGetConfig(key){
+  try{
+    const r = await supaFetch('config','GET',null,`?key=eq.${key}`);
+    return r[0]?.value ?? null;
+  }catch(e){ return null; }
+}
+async function dbSetConfig(key, value){
+  try{ await supaFetch('config','POST',{key,value},'?on_conflict=key'); }
+  catch(e){ console.warn('Config write fail:',e); }
+}
+
+// localStorage pour config légère (credentials, thème, notifs)
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f6f2;--bg2:#eeeae3;--bg3:#e5e0d8;
+  --text:#1a1814;--text2:#7a7670;--text3:#a8a49e;
+  --border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.18);
+  --accent:#1a1814;--white:#fff;--sold-bg:rgba(0,0,0,0.42);
+  --green:#1e5c3a;--red:#8b1a1a;--gold:#b8872a;--promo:#5c3d8f;
+  --shadow:0 2px 16px rgba(0,0,0,.06);
+  --shadow-lg:0 8px 40px rgba(0,0,0,.10);
+  --radius:3px;
+  --font-serif:'Cormorant Garamond',serif;
+  --font-sans:'Montserrat',sans-serif;
+}
+[data-theme="dark"]{
+  --bg:#0f0e0c;--bg2:#181714;--bg3:#201f1c;
+  --text:#f0ece4;--text2:#88847c;--text3:#5a5650;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.18);
+  --accent:#f0ece4;--white:#181714;--sold-bg:rgba(0,0,0,0.6);
+  --shadow:0 2px 16px rgba(0,0,0,.3);
+  --shadow-lg:0 8px 40px rgba(0,0,0,.4);
+}
+
+/* BASE */
+html{scroll-behavior:smooth}
+body{font-family:var(--font-sans);font-weight:300;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:rgba(248,246,242,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;gap:.5rem}
+[data-theme="dark"] nav{background:rgba(15,14,12,0.92)}
+.logo{font-family:var(--font-serif);font-size:21px;font-weight:600;letter-spacing:5px;text-transform:uppercase;line-height:1}
+.logo span{font-weight:300;opacity:.7}
+.logo-dep{font-size:7.5px;letter-spacing:3.5px;color:var(--text3);text-transform:uppercase;margin-top:2px}
+.nav-links{display:flex;gap:.85rem;align-items:center;flex-wrap:wrap}
+.nav-link{font-size:9.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text2);cursor:pointer;padding-bottom:2px;border:none;border-bottom:1px solid transparent;background:none;font-family:var(--font-sans);transition:all .2s}
+.nav-link:hover,.nav-link.active{color:var(--text);border-bottom-color:var(--text)}
+.admin-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);cursor:pointer;padding:6px 12px;border:0.5px solid var(--border);border-radius:var(--radius);background:none;font-family:var(--font-sans);transition:all .2s}
+.admin-btn:hover{color:var(--text);border-color:var(--border2);background:var(--white)}
+.theme-toggle{background:none;border:0.5px solid var(--border);border-radius:var(--radius);padding:6px 9px;cursor:pointer;color:var(--text2);font-size:14px;line-height:1;transition:all .2s;display:flex;align-items:center}
+.theme-toggle:hover{color:var(--text);border-color:var(--border2);background:var(--white)}
+.notif-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--red);color:#fff;font-size:7.5px;font-weight:600;min-width:15px;height:15px;border-radius:8px;padding:0 3px;margin-left:4px;vertical-align:middle}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* SECTION */
+.section{display:none}.section.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* HERO */
+.hero{text-align:center;padding:3.5rem 2rem 2rem;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,var(--bg2) 0%,transparent 100%);opacity:.4;pointer-events:none}
+.hero-eyebrow{font-size:8px;letter-spacing:5px;text-transform:uppercase;color:var(--text3);margin-bottom:.85rem}
+.hero-title{font-family:var(--font-serif);font-size:52px;font-weight:300;letter-spacing:5px;text-transform:uppercase;line-height:1;position:relative}
+.hero-sub{font-size:9.5px;letter-spacing:4px;text-transform:uppercase;color:var(--text2);margin-top:.75rem}
+.hero-divider{width:28px;height:0.5px;background:var(--border2);margin:1.5rem auto .5rem}
+
+/* STATS BAR */
+.stats-bar{display:flex;justify-content:center;margin:1.5rem 2rem;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--white);box-shadow:var(--shadow)}
+.stat{flex:1;text-align:center;padding:1rem .5rem;border-right:0.5px solid var(--border)}
+.stat:last-child{border-right:none}
+.stat-num{font-family:var(--font-serif);font-size:28px;font-weight:300;letter-spacing:1px}
+.stat-label{font-size:7.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-top:3px}
+
+/* SEARCH */
+.search-wrap{padding:0 2rem .9rem;display:flex;justify-content:center}
+.search-input{width:100%;max-width:440px;padding:10px 16px 10px 38px;border:0.5px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:12px;background:var(--white);color:var(--text);outline:none;transition:all .2s;box-shadow:var(--shadow);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237a7670' stroke-width='1.5'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:13px center}
+.search-input:focus{border-color:var(--border2);box-shadow:0 0 0 3px rgba(26,24,20,.06)}
+.search-input::placeholder{color:var(--text3);font-size:11px;letter-spacing:1px}
+
+/* FILTERS */
+.filters{display:flex;gap:.4rem;justify-content:center;padding:0 2rem 1.2rem;flex-wrap:wrap}
+.filter-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:5px 13px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--white);cursor:pointer;color:var(--text2);transition:all .2s;font-family:var(--font-sans)}
+.filter-btn:hover{color:var(--text);border-color:var(--border2)}
+.filter-btn.active{background:var(--accent);color:var(--white);border-color:var(--accent)}
+.size-filters{margin-top:-.5rem;padding-bottom:.8rem}
+.size-select{font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:6px 28px 6px 12px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--white);color:var(--text2);cursor:pointer;font-family:var(--font-sans);outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%237a7670' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;box-shadow:var(--shadow)}
+.size-select:focus{border-color:var(--border2)}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:1.4rem;padding:0 2rem 3.5rem}
+.card{border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--white);transition:all .28s cubic-bezier(.4,0,.2,1);cursor:pointer;position:relative;box-shadow:var(--shadow)}
+.card:hover{border-color:var(--border2);transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.card.sold{opacity:.6}
+.card-img{width:100%;aspect-ratio:3/4;background:var(--bg2);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.card-img img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;transition:transform .4s cubic-bezier(.4,0,.2,1)}
+.card:hover .card-img img{transform:scale(1.05)}
+.card-icon-placeholder{font-size:32px;color:var(--text3);opacity:.3}
+.sold-overlay{position:absolute;inset:0;background:var(--sold-bg);display:flex;align-items:center;justify-content:center}
+.sold-tag{font-size:8.5px;letter-spacing:3.5px;text-transform:uppercase;color:#fff;border:0.5px solid rgba(255,255,255,.7);padding:5px 14px}
+.promo-badge{position:absolute;top:9px;left:9px;background:var(--promo);color:#fff;font-size:7.5px;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;border-radius:var(--radius);font-weight:500;z-index:1}
+.card-body{padding:.85rem 1rem}
+.card-brand{font-size:8.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3)}
+.card-name{font-size:12.5px;font-weight:400;margin-top:3px;line-height:1.35}
+.card-meta{font-size:10px;color:var(--text2);margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.card-cat{font-size:7.5px;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;background:var(--bg2);border-radius:var(--radius);color:var(--text3)}
+.card-price{font-size:11px;margin-top:6px;display:flex;gap:7px;align-items:center}
+.price-original{text-decoration:line-through;color:var(--text3)}
+.price-promo{color:var(--promo);font-weight:500}
+.price-normal{color:var(--text);font-weight:400}
+.empty-state{grid-column:1/-1;text-align:center;padding:5rem 0;color:var(--text3);font-size:13px}
+
+/* PROMO BANNER */
+.promo-banner{background:var(--accent);color:var(--bg);text-align:center;padding:.65rem 1.5rem;font-size:10px;letter-spacing:3px;text-transform:uppercase;display:none}
+.promo-banner.show{display:block}
+
+/* PROMO WIDGET */
+.promo-widget{margin:0 2rem 1.1rem;border:0.5px solid var(--border);border-radius:var(--radius);padding:.9rem 1.1rem;background:var(--white);display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;box-shadow:var(--shadow)}
+.promo-widget label{font-size:8.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text2);flex-shrink:0}
+.promo-input{flex:1;min-width:120px;padding:7px 10px;border:0.5px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:12px;text-transform:uppercase;letter-spacing:2px;outline:none;transition:border-color .2s;background:var(--bg)}
+.promo-input:focus{border-color:var(--border2)}
+.promo-apply{font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:7px 14px;border:0.5px solid var(--accent);border-radius:var(--radius);background:var(--accent);color:var(--white);cursor:pointer;font-family:var(--font-sans);transition:opacity .2s;white-space:nowrap}
+.promo-apply:hover{opacity:.82}
+.promo-msg{font-size:10px;width:100%;margin-top:2px}
+.promo-msg.ok{color:var(--green)}.promo-msg.err{color:var(--red)}
+.promo-active-tag{font-size:8.5px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;background:rgba(92,61,143,.1);color:var(--promo);border-radius:var(--radius);cursor:pointer}
+
+/* NEWSLETTER */
+.newsletter-section{margin:0 2rem 2.5rem;border:0.5px solid var(--border);border-radius:var(--radius);padding:2rem;background:var(--white);text-align:center;box-shadow:var(--shadow)}
+.newsletter-title{font-family:var(--font-serif);font-size:24px;letter-spacing:3px;text-transform:uppercase;margin-bottom:.4rem}
+.newsletter-sub{font-size:10.5px;color:var(--text2);letter-spacing:1px;margin-bottom:1.2rem}
+.newsletter-form{display:flex;gap:.5rem;max-width:380px;margin:0 auto;flex-wrap:wrap}
+.newsletter-input{flex:1;min-width:180px;padding:10px 13px;border:0.5px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:12px;outline:none;background:var(--bg);transition:border-color .2s}
+.newsletter-input:focus{border-color:var(--border2)}
+.newsletter-btn{padding:10px 20px;background:var(--accent);color:var(--white);border:none;border-radius:var(--radius);font-family:var(--font-sans);font-size:9px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:opacity .2s}
+.newsletter-btn:hover{opacity:.85}
+.newsletter-ok{font-size:11px;color:var(--green);margin-top:.5rem;display:none}
+
+/* FICHE PRODUIT */
+.fiche-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;opacity:0;transition:opacity .3s;backdrop-filter:blur(4px)}
+.fiche-overlay.open{display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem 1rem}
+.fiche-overlay.visible{opacity:1}
+.fiche-panel{background:var(--bg);width:100%;max-width:820px;border-radius:var(--radius);border:0.5px solid var(--border);margin:auto;transform:translateY(28px);transition:transform .32s cubic-bezier(.4,0,.2,1);overflow:hidden;box-shadow:var(--shadow-lg)}
+.fiche-overlay.visible .fiche-panel{transform:translateY(0)}
+.fiche-inner{display:grid;grid-template-columns:1fr 1fr;min-height:440px}
+.fiche-gallery{background:var(--bg2);position:relative;min-height:400px;display:flex;flex-direction:column}
+.fiche-main-img{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;cursor:zoom-in;min-height:320px}
+.fiche-main-img img{width:100%;height:100%;object-fit:cover;transition:transform .4s cubic-bezier(.4,0,.2,1)}
+.fiche-main-img:hover img{transform:scale(1.04)}
+.fiche-main-img .card-icon-placeholder{font-size:52px}
+.fiche-gallery-arrow{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.9);border:0.5px solid var(--border);border-radius:var(--radius);width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:var(--text);z-index:2;transition:all .2s;box-shadow:var(--shadow)}
+.fiche-gallery-arrow:hover{background:var(--white);box-shadow:var(--shadow-lg)}
+.fiche-gallery-arrow.prev{left:10px}.fiche-gallery-arrow.next{right:10px}
+.fiche-thumbs{display:flex;gap:5px;padding:8px;overflow-x:auto;background:var(--bg3);border-top:0.5px solid var(--border)}
+.fiche-thumb{width:50px;height:62px;flex-shrink:0;border:1.5px solid transparent;border-radius:var(--radius);overflow:hidden;cursor:pointer;opacity:.55;transition:all .2s}
+.fiche-thumb.active{border-color:var(--accent);opacity:1}
+.fiche-thumb img{width:100%;height:100%;object-fit:cover}
+.fiche-info{padding:2rem;display:flex;flex-direction:column;gap:.85rem;background:var(--white)}
+.fiche-back{display:inline-flex;align-items:center;gap:5px;font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);cursor:pointer;border:none;background:none;font-family:var(--font-sans);padding:0;transition:color .2s}
+.fiche-back:hover{color:var(--text2)}
+.fiche-status{display:inline-flex;align-items:center;gap:5px;font-size:8.5px;letter-spacing:2px;text-transform:uppercase;padding:4px 11px;border-radius:var(--radius);width:fit-content}
+.fiche-status.dispo{background:rgba(30,92,58,.09);color:var(--green)}
+.fiche-status.vendu{background:rgba(139,26,26,.09);color:var(--red)}
+.fiche-brand{font-size:9.5px;letter-spacing:3.5px;text-transform:uppercase;color:var(--text3)}
+.fiche-name{font-family:var(--font-serif);font-size:30px;font-weight:400;letter-spacing:1.5px;line-height:1.15}
+.fiche-metas{display:flex;flex-direction:column;gap:.45rem;padding:.85rem 0;border-top:0.5px solid var(--border);border-bottom:0.5px solid var(--border)}
+.fiche-meta-row{display:flex;gap:.75rem;align-items:center;font-size:11px}
+.fiche-meta-label{font-size:8.5px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);width:72px;flex-shrink:0}
+.fiche-meta-val{color:var(--text)}
+.fiche-desc{font-size:12px;line-height:1.85;color:var(--text2)}
+.fiche-price-block{padding:.85rem 1rem;background:var(--bg2);border-radius:var(--radius)}
+.fiche-price-label{font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.fiche-price-row{display:flex;align-items:baseline;gap:9px}
+.fiche-price-orig{font-size:16px;text-decoration:line-through;color:var(--text3)}
+.fiche-price-final{font-size:24px;font-family:var(--font-serif);color:var(--promo);font-weight:400}
+.fiche-price-normal{font-size:24px;font-family:var(--font-serif);color:var(--text);font-weight:300}
+.fiche-promo-tag{font-size:8.5px;letter-spacing:1px;background:var(--promo);color:#fff;padding:2px 8px;border-radius:var(--radius);text-transform:uppercase}
+
+/* AVIS */
+.avis-wrap{max-width:720px;margin:2.5rem auto;padding:0 2rem}
+.avis-header-block{text-align:center;margin-bottom:2rem}
+.avis-score-big{font-family:var(--font-serif);font-size:60px;font-weight:300;line-height:1}
+.avis-stars-big{display:flex;gap:3px;justify-content:center;margin:.4rem 0}
+.avis-count{font-size:9.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3)}
+.avis-platforms{display:flex;gap:0;justify-content:center;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin:1.2rem 0;box-shadow:var(--shadow)}
+.avis-plat{flex:1;text-align:center;padding:.85rem .5rem;border-right:0.5px solid var(--border);background:var(--white)}
+.avis-plat:last-child{border-right:none}
+.avis-plat-name{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--text3)}
+.avis-plat-num{font-family:var(--font-serif);font-size:24px;font-weight:300;margin-top:2px}
+.avis-list{display:flex;flex-direction:column;gap:1rem;margin-top:1.5rem}
+.avis-item{border:0.5px solid var(--border);border-radius:var(--radius);background:var(--white);overflow:hidden;display:grid;grid-template-columns:auto 1fr;box-shadow:var(--shadow)}
+.avis-item-photo{width:88px;background:var(--bg2);cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.avis-item-photo img{width:100%;height:100%;object-fit:cover;transition:transform .3s}
+.avis-item-photo:hover img{transform:scale(1.05)}
+.avis-item-photo.no-photo{cursor:default;min-height:80px}
+.avis-item-photo i{font-size:22px;color:var(--text3);opacity:.3}
+.avis-item-body{padding:1rem 1.1rem}
+.avis-item-top{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.4rem}
+.avis-item-name{font-size:12px;font-weight:500}
+.avis-item-stars{display:flex;gap:2px}
+.avis-item-plat{font-size:7.5px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);padding:2px 7px;background:var(--bg2);border-radius:var(--radius)}
+.avis-item-date{font-size:10px;color:var(--text3);margin-left:auto}
+.avis-item-text{font-size:12px;line-height:1.75;color:var(--text2)}
+
+/* APROPOS */
+.about-wrap{max-width:620px;margin:2.5rem auto;padding:0 2rem}
+.about-card{border:0.5px solid var(--border);border-radius:var(--radius);padding:2rem;background:var(--white);box-shadow:var(--shadow)}
+.about-header{display:flex;gap:1.3rem;align-items:flex-start;margin-bottom:1.3rem}
+.about-avatar{width:64px;height:64px;border-radius:50%;background:var(--bg2);border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:22px;color:var(--text2);flex-shrink:0;overflow:hidden}
+.about-avatar img{width:100%;height:100%;object-fit:cover}
+.about-name{font-family:var(--font-serif);font-size:21px;font-weight:400;letter-spacing:2px}
+.about-location{font-size:8.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-top:4px}
+.about-text{font-size:13px;line-height:1.95;color:var(--text2);white-space:pre-wrap}
+.about-contact{margin-top:1.3rem;padding-top:1.3rem;border-top:0.5px solid var(--border)}
+.contact-btns{display:flex;gap:.6rem;flex-wrap:wrap}
+.contact-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 15px;border-radius:var(--radius);border:0.5px solid var(--border);font-family:var(--font-sans);font-size:9.5px;font-weight:400;letter-spacing:2px;text-transform:uppercase;text-decoration:none;cursor:pointer;transition:all .22s;color:var(--text2);background:var(--white)}
+.contact-btn i{font-size:15px}
+.contact-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.contact-btn.whatsapp:hover{background:#25D366;color:#fff;border-color:#25D366}
+.contact-btn.instagram:hover{background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;border-color:transparent}
+.contact-btn.email:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.contact-btn.vinted:hover{background:#008080;color:#fff;border-color:#008080}
+
+/* LOGIN */
+.login-wrap{max-width:380px;margin:6rem auto;padding:0 1.5rem}
+.login-card{border:0.5px solid var(--border);border-radius:var(--radius);padding:2.75rem;background:var(--white);box-shadow:var(--shadow-lg)}
+.login-title{font-family:var(--font-serif);font-size:24px;letter-spacing:3px;text-transform:uppercase;text-align:center;margin-bottom:2rem}
+.form-group{margin-bottom:1.3rem}
+.form-group label{font-size:8.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:7px}
+.form-group input{width:100%;padding:11px 13px;border:0.5px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:13px;background:var(--bg);color:var(--text);outline:none;transition:all .2s}
+.form-group input:focus{border-color:var(--border2);background:var(--white);box-shadow:0 0 0 3px rgba(26,24,20,.05)}
+.btn-primary{width:100%;padding:12px;background:var(--accent);color:var(--white);border:none;border-radius:var(--radius);font-family:var(--font-sans);font-size:9.5px;letter-spacing:2.5px;text-transform:uppercase;cursor:pointer;margin-top:.5rem;transition:opacity .2s}
+.btn-primary:hover{opacity:.85}
+.login-error{font-size:11px;color:var(--red);text-align:center;margin-top:1rem;display:none}
+
+/* ADMIN */
+.admin-wrap{padding:2rem;max-width:1000px;margin:0 auto}
+.admin-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.75rem;padding-bottom:1.25rem;border-bottom:0.5px solid var(--border);flex-wrap:wrap;gap:.75rem}
+.admin-title{font-family:var(--font-serif);font-size:24px;letter-spacing:3px;text-transform:uppercase}
+.admin-subtitle{font-size:10px;color:var(--text3);letter-spacing:1.5px;margin-top:3px}
+.btn-sm{font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:7px 14px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--white);cursor:pointer;font-family:var(--font-sans);color:var(--text2);transition:all .2s}
+.btn-sm:hover{color:var(--text);border-color:var(--border2)}
+.btn-sm.danger{color:var(--red);border-color:rgba(139,26,26,.25)}
+.btn-sm.danger:hover{background:rgba(139,26,26,.05)}
+.btn-sm.success{color:var(--green);border-color:rgba(30,92,58,.25)}
+.admin-tabs{display:flex;margin-bottom:1.75rem;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;flex-wrap:wrap;background:var(--white);box-shadow:var(--shadow)}
+.admin-tab{font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:9px 15px;cursor:pointer;background:none;border:none;border-right:0.5px solid var(--border);font-family:var(--font-sans);color:var(--text2);transition:all .2s}
+.admin-tab:last-child{border-right:none}
+.admin-tab.active{background:var(--accent);color:var(--white)}
+.admin-panel{display:none}.admin-panel.active{display:block}
+.add-form-card{border:0.5px solid var(--border);border-radius:var(--radius);padding:1.5rem;background:var(--white);margin-bottom:1.75rem;box-shadow:var(--shadow)}
+.add-form-title{font-size:9.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-bottom:1.1rem}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.form-grid .span2{grid-column:1/-1}
+.admin-form-group label{font-size:8.5px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:6px}
+.admin-form-group input,.admin-form-group select,.admin-form-group textarea{width:100%;padding:9px 11px;border:0.5px solid var(--border);border-radius:var(--radius);font-family:var(--font-sans);font-size:12px;background:var(--bg);color:var(--text);outline:none;transition:all .2s}
+.admin-form-group input:focus,.admin-form-group select:focus,.admin-form-group textarea:focus{border-color:var(--border2);background:var(--white)}
+.form-actions{display:flex;gap:.6rem;margin-top:1.1rem;flex-wrap:wrap}
+.admin-article-list{display:flex;flex-direction:column;gap:.65rem}
+.admin-article-item{display:flex;align-items:center;gap:.9rem;padding:.9rem 1rem;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--white);flex-wrap:wrap;box-shadow:var(--shadow)}
+.admin-article-item.sold{opacity:.55}
+.admin-thumb{width:42px;height:54px;background:var(--bg2);border-radius:var(--radius);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.admin-thumb img{width:100%;height:100%;object-fit:cover}
+.admin-thumb i{font-size:16px;color:var(--text3);opacity:.4}
+.admin-article-info{flex:1;min-width:100px}
+.admin-article-brand{font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3)}
+.admin-article-name{font-size:12.5px;font-weight:400}
+.admin-article-meta{font-size:10px;color:var(--text2);margin-top:1px}
+.status-badge{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;border-radius:var(--radius)}
+.status-badge.dispo{background:rgba(30,92,58,.09);color:var(--green)}
+.status-badge.vendu{background:rgba(139,26,26,.09);color:var(--red)}
+.admin-article-actions{display:flex;gap:.4rem;align-items:center}
+.profil-card{border:0.5px solid var(--border);border-radius:var(--radius);padding:1.5rem;background:var(--white);max-width:540px;box-shadow:var(--shadow)}
+.profil-title{font-size:9.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-bottom:1.1rem}
+.img-upload-area{width:100%;height:76px;border:0.5px dashed var(--border2);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font-size:11px;color:var(--text3);transition:all .2s;background:var(--bg)}
+.img-upload-area:hover{border-color:var(--accent);color:var(--text2)}
+.img-preview{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.img-preview-item{width:56px;height:70px;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;position:relative}
+.img-preview-item img{width:100%;height:100%;object-fit:cover}
+.img-preview-remove{position:absolute;top:2px;right:2px;width:16px;height:16px;background:rgba(0,0,0,.65);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:9px;color:#fff;border:none}
+.success-msg{font-size:11px;color:var(--green);margin-top:.5rem;display:none}
+.error-msg{font-size:11px;color:var(--red);margin-top:.5rem;display:none}
+.star-selector{display:flex;gap:4px;margin-top:4px}
+.star-selector i{font-size:20px;color:var(--border2);cursor:pointer;transition:color .15s}
+.star-selector i.on{color:var(--gold)}
+.admin-avis-list{display:flex;flex-direction:column;gap:.6rem;margin-top:1rem}
+.admin-avis-item{display:flex;align-items:center;gap:.85rem;padding:.8rem .9rem;border:0.5px solid var(--border);border-radius:2px;background:var(--white);flex-wrap:wrap}
+.admin-avis-thumb{width:52px;height:40px;background:var(--bg2);border-radius:1px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.admin-avis-thumb img{width:100%;height:100%;object-fit:cover}
+.admin-avis-info{flex:1;min-width:100px}
+
+/* CODES PROMO ADMIN */
+.promo-list{display:flex;flex-direction:column;gap:.6rem;margin-top:1rem}
+.promo-item{display:flex;align-items:center;gap:.85rem;padding:.75rem 1rem;border:0.5px solid var(--border);border-radius:2px;background:var(--white);flex-wrap:wrap}
+.promo-item-code{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:var(--promo)}
+.promo-item-info{flex:1;min-width:80px}
+.promo-item-pct{font-size:11px;color:var(--text2)}
+.promo-item-uses{font-size:10px;color:var(--text2)}
+.promo-active{font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:2px;background:rgba(45,106,79,.1);color:var(--green)}
+.promo-inactive{font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:2px;background:rgba(155,34,38,.1);color:var(--red)}
+
+/* NEWSLETTER ADMIN */
+.abonnes-list{display:flex;flex-direction:column;gap:.4rem;margin-top:1rem;max-height:300px;overflow-y:auto}
+.abonne-item{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;border:0.5px solid var(--border);border-radius:2px;background:var(--white);font-size:12px}
+.abonne-email{color:var(--text)}
+.abonne-date{font-size:10px;color:var(--text2)}
+.newsletter-send-card{border:0.5px solid var(--border);border-radius:2px;padding:1.25rem;background:var(--white);margin-top:1.5rem}
+
+/* LIGHTBOX */
+.lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;align-items:center;justify-content:center}
+.lightbox.open{display:flex}
+.lightbox img{max-width:90vw;max-height:90vh;object-fit:contain}
+.lightbox-close{position:absolute;top:1.5rem;right:1.5rem;font-size:24px;color:#fff;cursor:pointer;background:rgba(255,255,255,.1);border:0.5px solid rgba(255,255,255,.2);border-radius:2px;width:36px;height:36px;display:flex;align-items:center;justify-content:center}
+
+/* SYNC STATUS */
+.sync-bar{position:fixed;bottom:1rem;right:1rem;padding:7px 14px;border-radius:2px;font-size:10px;letter-spacing:1px;text-transform:uppercase;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.sync-bar.show{opacity:1}
+.sync-bar.saving{background:var(--promo);color:#fff}
+.sync-bar.ok{background:var(--green);color:#fff}
+.sync-bar.err{background:var(--red);color:#fff}
+
+@media(max-width:600px){
+  nav{padding:.9rem 1rem}
+  .hero-title{font-size:34px}
+  .grid{grid-template-columns:repeat(2,1fr);gap:.85rem;padding:0 1rem 2rem}
+  .form-grid{grid-template-columns:1fr}
+  .admin-wrap{padding:.9rem}
+  .fiche-inner{grid-template-columns:1fr}
+  .fiche-gallery{min-height:260px}
+  .fiche-info{padding:1.25rem}
+  .fiche-name{font-size:22px}
+  .newsletter-form{flex-direction:column}
+  .promo-widget{flex-direction:column;align-items:flex-start}
+}
+
+/* FILTRE TAILLE */
+.size-filters{margin-top:-.4rem;padding-bottom:.6rem}
+.size-select{font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:5px 28px 5px 12px;border:0.5px solid var(--border);border-radius:2px;background:var(--white);color:var(--text2);cursor:pointer;font-family:'Montserrat',sans-serif;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6b66' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;transition:border-color .2s}
+.size-select:focus{border-color:var(--border2)}
+
+/* BOUTON RÉSERVER */
+.btn-reserver{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:2px;font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:opacity .2s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-reserver:hover{opacity:.82}
+.btn-reserver.vendu{background:var(--text2);cursor:not-allowed;opacity:.6}
+
+/* MODAL RÉSERVATION */
+.resa-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;align-items:center;justify-content:center;padding:1rem;opacity:0;transition:opacity .25s}
+.resa-overlay.open{display:flex}
+.resa-overlay.visible{opacity:1}
+.resa-panel{background:var(--bg);width:100%;max-width:440px;border-radius:2px;border:0.5px solid var(--border);transform:translateY(20px);transition:transform .25s;overflow:hidden}
+.resa-overlay.visible .resa-panel{transform:translateY(0)}
+.resa-header{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 1.5rem;border-bottom:0.5px solid var(--border)}
+.resa-title{font-family:'Cormorant Garamond',serif;font-size:18px;letter-spacing:2px;text-transform:uppercase}
+.resa-close{background:none;border:none;cursor:pointer;font-size:18px;color:var(--text2);padding:0;line-height:1;transition:color .2s}
+.resa-close:hover{color:var(--text)}
+.resa-article{padding:.9rem 1.5rem;background:var(--bg2);border-bottom:0.5px solid var(--border);font-size:12px;color:var(--text2);line-height:1.6}
+.resa-article strong{color:var(--text);font-size:13px}
+.resa-form{padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:.85rem}
+.resa-group label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);display:block;margin-bottom:5px}
+.resa-group input,.resa-group textarea{width:100%;padding:9px 11px;border:0.5px solid var(--border);border-radius:2px;font-family:'Montserrat',sans-serif;font-size:12px;background:var(--white);color:var(--text);outline:none;transition:border-color .2s;resize:none}
+.resa-group input:focus,.resa-group textarea:focus{border-color:var(--border2)}
+.resa-submit{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:2px;font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:opacity .2s}
+.resa-submit:hover{opacity:.82}
+.resa-submit:disabled{opacity:.5;cursor:not-allowed}
+.resa-ok{font-size:11px;color:var(--green);text-align:center;display:none;letter-spacing:1px;padding:.3rem 0}
+.resa-err{font-size:11px;color:var(--red);text-align:center;display:none}
+
+/* BADGE RÉSERVÉ sur la carte */
+.badge-reserve{position:absolute;top:8px;right:8px;background:#c9952a;color:#fff;font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;border-radius:2px;font-weight:500;z-index:1}
+
+/* LIVRAISON */
+.livraison-wrap{max-width:760px;margin:0 auto;padding:0 1.5rem 3rem;display:flex;flex-direction:column;gap:1.2rem}
+.livraison-info-bar{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+.livraison-info-item{display:flex;align-items:flex-start;gap:.75rem;border:0.5px solid var(--border);border-radius:2px;padding:.85rem 1rem;background:var(--white)}
+.livraison-info-item .ti{font-size:18px;color:var(--text2);margin-top:1px;flex-shrink:0}
+.linfo-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);margin-bottom:2px}
+.linfo-val{font-size:12px;color:var(--text)}
+.livraison-map-card,.livraison-paypal-card{border:0.5px solid var(--border);border-radius:2px;padding:1.2rem;background:var(--white)}
+.livraison-map-title{font-family:'Cormorant Garamond',serif;font-size:18px;letter-spacing:3px;text-transform:uppercase;margin-bottom:.3rem}
+.livraison-map-sub{font-size:11px;color:var(--text2);margin-bottom:1rem;letter-spacing:.5px}
+#livraison-map{height:360px;border-radius:2px;border:0.5px solid var(--border);overflow:hidden;z-index:0}
+.paypal-methods{display:flex;flex-direction:column;gap:.6rem}
+.paypal-method{display:flex;align-items:center;gap:.85rem;padding:.75rem 1rem;border:0.5px solid var(--border);border-radius:2px;background:var(--bg)}
+@media(max-width:600px){.livraison-info-bar{grid-template-columns:1fr}#livraison-map{height:260px}}
+
+/* BOUTON PAYPAL */
+.btn-paypal{display:flex;align-items:center;justify-content:center;width:100%;padding:11px;background:#003087;color:#fff;border:none;border-radius:2px;font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:opacity .2s}
+.btn-paypal:hover{opacity:.85}
+
+.back-to-top{position:fixed;bottom:1.5rem;right:1.5rem;width:38px;height:38px;border-radius:2px;background:var(--accent);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;z-index:500;transform:translateY(8px)}
+.back-to-top.show{opacity:1;pointer-events:auto;transform:translateY(0)}
+.back-to-top:hover{opacity:.82}
+
+
+.contact-form-wrap{margin-top:1.5rem;padding-top:1.5rem;border-top:0.5px solid var(--border)}
+.contact-form-title{font-family:'Cormorant Garamond',serif;font-size:18px;letter-spacing:3px;text-transform:uppercase;margin-bottom:1rem;color:var(--text)}
+.contact-form-group{margin-bottom:.9rem}
+.contact-form-group label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);display:block;margin-bottom:5px}
+.contact-form-group input,.contact-form-group textarea,.contact-form-group select{width:100%;padding:9px 11px;border:0.5px solid var(--border);border-radius:2px;font-family:'Montserrat',sans-serif;font-size:12px;background:var(--bg);color:var(--text);outline:none;transition:border-color .2s;resize:none}
+.contact-form-group input:focus,.contact-form-group textarea:focus,.contact-form-group select:focus{border-color:var(--border2)}
+.contact-submit{width:100%;padding:11px;background:var(--accent);color:var(--white);border:none;border-radius:2px;font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:opacity .2s;margin-top:.3rem}
+.contact-submit:hover{opacity:.82}
+.contact-submit:disabled{opacity:.5;cursor:not-allowed}
+.contact-ok{font-size:11px;color:var(--green);text-align:center;margin-top:.7rem;display:none;letter-spacing:1px}
+.contact-err{font-size:11px;color:var(--red);text-align:center;margin-top:.7rem;display:none}
+
+/* FOOTER MENTIONS LÉGALES */
+footer{border-top:0.5px solid var(--border);padding:1.25rem 1.5rem;margin-top:2rem;background:var(--white)}
+.footer-inner{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:.75rem}
+.footer-title{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--text2);margin-bottom:.4rem}
+.footer-text{font-size:10px;color:var(--text2);line-height:1.8}
+.footer-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.footer-bottom{border-top:0.5px solid var(--border);padding-top:.75rem;text-align:center;font-size:9px;color:var(--text2);letter-spacing:1px}
+@media(max-width:600px){.footer-grid{grid-template-columns:1fr}}
+
+/* AMÉLIORATIONS FLUIDITÉ */
+html{scroll-behavior:smooth}
+.card,.contact-btn,.btn-primary,.btn-sm,.nav-link,.filter-btn{transition:all .22s cubic-bezier(.4,0,.2,1)}
+.section{animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- SYNC BAR -->
+<div class="sync-bar" id="sync-bar"></div>
+
+<nav>
+  <div>
+    <div class="logo">Alpe<span>Style</span></div>
+    <div class="logo-dep">Haute-Savoie · 74</div>
+  </div>
+  <div class="nav-links">
+    <button class="nav-link active" onclick="showPage('vitrine',this)">Vitrine</button>
+    <button class="nav-link" onclick="showPage('avis',this)">Avis</button>
+    <button class="nav-link" onclick="showPage('livraison',this)">Livraison</button>
+    <button class="nav-link" onclick="showPage('apropos',this)">À propos</button>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Mode sombre / clair">
+      <i class="ti ti-moon" id="theme-icon"></i>
+    </button>
+    <button class="admin-btn" id="admin-nav-btn" onclick="handleAdminBtn()">
+      <i class="ti ti-lock" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Admin<span class="notif-badge" id="notif-badge" style="display:none">0</span>
+    </button>
+  </div>
+</nav>
+
+<!-- VITRINE -->
+<div id="page-vitrine" class="section active">
+  <div class="promo-banner" id="promo-banner"></div>
+  <div class="hero">
+    <div class="hero-eyebrow">Haute-Savoie · France</div>
+    <div class="hero-title">Pièces<br>de marque</div>
+    <div class="hero-divider"></div>
+    <div class="hero-sub">Sélection exclusive · Homme · 74</div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-num" id="stat-dispo">0</div><div class="stat-label">Disponibles</div></div>
+    <div class="stat"><div class="stat-num" id="stat-vendu">0</div><div class="stat-label">Vendus</div></div>
+    <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Total</div></div>
+  </div>
+  <!-- CODE PROMO -->
+  <div class="promo-widget" id="promo-widget">
+    <label>Code promo</label>
+    <input class="promo-input" id="promo-code-input" placeholder="VOTRE CODE" maxlength="20">
+    <button class="promo-apply" onclick="applyPromo()">Appliquer</button>
+    <span class="promo-active-tag" id="promo-active-tag" style="display:none" onclick="removePromo()">✓ Code actif · Retirer</span>
+    <div class="promo-msg" id="promo-msg"></div>
+  </div>
+  <div class="search-wrap">
+    <input class="search-input" id="search-input" type="text" placeholder="Rechercher une marque, un article…" oninput="onSearch()">
+  </div>
+  <div class="filters">
+    <button class="filter-btn active" onclick="filterGrid('all',this)">Tout</button>
+    <button class="filter-btn" onclick="filterGrid('dispo',this)">Disponibles</button>
+    <button class="filter-btn" onclick="filterGrid('vendu',this)">Vendus</button>
+    <button class="filter-btn" onclick="filterGrid('cat:Vestes',this)">Vestes</button>
+    <button class="filter-btn" onclick="filterGrid('cat:Pulls',this)">Pulls</button>
+    <button class="filter-btn" onclick="filterGrid('cat:Pantalons',this)">Pantalons</button>
+    <button class="filter-btn" onclick="filterGrid('cat:Chaussures',this)">Chaussures</button>
+    <button class="filter-btn" onclick="filterGrid('cat:Tshirts',this)">T-shirts</button>
+  </div>
+  <div class="filters size-filters">
+    <select class="size-select" onchange="filterSize(this.value)">
+      <option value="all">Toutes les tailles</option>
+      <option value="S">S</option>
+      <option value="M">M</option>
+      <option value="L">L</option>
+      <option value="XL">XL</option>
+    </select>
+  </div>
+  <div class="grid" id="public-grid"></div>
+  <!-- NEWSLETTER -->
+  <div class="newsletter-section" id="newsletter-section">
+    <div class="newsletter-title">Restez informé</div>
+    <div class="newsletter-sub">Nouveaux articles, codes promo exclusifs — ne ratez rien</div>
+    <div class="newsletter-form">
+      <input class="newsletter-input" id="nl-email" type="email" placeholder="votre@email.fr">
+      <button class="newsletter-btn" onclick="subscribeNewsletter()">S'inscrire</button>
+    </div>
+    <div class="newsletter-ok" id="nl-ok">✓ Inscription confirmée, merci !</div>
+  </div>
+</div>
+
+<!-- AVIS -->
+<div id="page-avis" class="section">
+  <div class="avis-wrap">
+    <div class="hero" style="padding-bottom:.5rem">
+      <div class="hero-title" style="font-size:36px;letter-spacing:4px">Avis clients</div>
+    </div>
+    <div id="avis-score-block"></div>
+    <div id="avis-platforms-block"></div>
+    <div class="avis-list" id="avis-public-list"></div>
+    <div id="avis-empty" style="text-align:center;padding:3rem 0;color:var(--text2);font-size:13px;display:none">Aucun avis pour le moment.</div>
+  </div>
+</div>
+
+<!-- À PROPOS -->
+<div id="page-apropos" class="section">
+  <div class="about-wrap">
+    <div class="about-card">
+      <div class="about-header">
+        <div class="about-avatar" id="pub-avatar-wrap"><span id="pub-avatar-initials">A</span></div>
+        <div>
+          <div class="about-name" id="pub-name">AlpeStyle 74</div>
+          <div class="about-location"><i class="ti ti-map-pin" style="font-size:10px;vertical-align:-1px"></i> Haute-Savoie · 74</div>
+        </div>
+      </div>
+      <div class="about-text" id="pub-bio"></div>
+      <div class="about-contact"><div class="contact-btns" id="pub-contact"></div></div>
+
+      <!-- FORMULAIRE CONTACT -->
+      <div class="contact-form-wrap">
+        <div class="contact-form-title">Nous contacter</div>
+        <div class="contact-form-group">
+          <label>Votre email</label>
+          <input type="email" id="ct-email" placeholder="votre@email.com">
+        </div>
+        <div class="contact-form-group">
+          <label>Objet</label>
+          <select id="ct-objet">
+            <option value="Question sur un article">Question sur un article</option>
+            <option value="Demande de réservation">Demande de réservation</option>
+            <option value="Problème / réclamation">Problème / réclamation</option>
+            <option value="Autre">Autre</option>
+          </select>
+        </div>
+        <div class="contact-form-group">
+          <label>Message</label>
+          <textarea id="ct-message" rows="4" placeholder="Votre message…"></textarea>
+        </div>
+        <button class="contact-submit" id="ct-submit" onclick="sendContact()">Envoyer le message</button>
+        <div class="contact-ok" id="ct-ok">✓ Message envoyé ! On vous répond vite.</div>
+        <div class="contact-err" id="ct-err">Une erreur est survenue, réessayez.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LIVRAISON -->
+<div id="page-livraison" class="section">
+  <div class="hero" style="padding-bottom:1rem">
+    <div class="hero-title" style="font-size:36px;letter-spacing:4px">Livraison</div>
+    <div class="hero-sub">Zone de livraison · Annecy & alentours</div>
+  </div>
+  <div class="livraison-wrap">
+    <div class="livraison-info-bar">
+      <div class="livraison-info-item"><i class="ti ti-map-pin"></i><div><div class="linfo-title">Basé à</div><div class="linfo-val">Annecy, Haute-Savoie</div></div></div>
+      <div class="livraison-info-item"><i class="ti ti-package"></i><div><div class="linfo-title">Livraison</div><div class="linfo-val">À domicile ou point de rencontre</div></div></div>
+      <div class="livraison-info-item"><i class="ti ti-currency-euro"></i><div><div class="linfo-title">Frais</div><div class="linfo-val">À convenir selon distance</div></div></div>
+      <div class="livraison-info-item"><i class="ti ti-hand-stop"></i><div><div class="linfo-title">Click & collect</div><div class="linfo-val">Disponible sur Annecy</div></div></div>
+    </div>
+    <div class="livraison-map-card">
+      <div class="livraison-map-title">Zone de livraison</div>
+      <div class="livraison-map-sub">La zone bleue indique où je livre. Hors zone ? Contactez-moi, on s'arrange !</div>
+      <div id="livraison-map"></div>
+    </div>
+    <div class="livraison-paypal-card">
+      <div class="livraison-map-title">Paiement</div>
+      <div class="livraison-map-sub">Paiement sécurisé via PayPal après confirmation de la réservation.</div>
+      <div class="paypal-methods">
+        <div class="paypal-method"><i class="ti ti-brand-paypal" style="font-size:22px;color:#003087"></i><div><div class="linfo-title">PayPal</div><div class="linfo-val">Lien envoyé après réservation</div></div></div>
+        <div class="paypal-method"><i class="ti ti-cash" style="font-size:22px;color:var(--green)"></i><div><div class="linfo-title">Espèces</div><div class="linfo-val">Possible en main propre</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="page-login" class="section">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-title">Accès admin</div>
+      <div class="form-group"><label>Identifiant</label><input type="text" id="login-user" placeholder="Identifiant" autocomplete="username"></div>
+      <div class="form-group"><label>Mot de passe</label><input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn-primary" onclick="doLogin()">Se connecter</button>
+      <div class="login-error" id="login-error">Identifiant ou mot de passe incorrect.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="page-admin" class="section">
+  <div class="admin-wrap">
+    <div class="admin-header">
+      <div><div class="admin-title">Administration</div><div class="admin-subtitle">AlpeStyle 74</div></div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn-sm success" onclick="showPage('vitrine',null)"><i class="ti ti-eye" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Vitrine</button>
+        <button class="btn-sm danger" onclick="doLogout()"><i class="ti ti-logout" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Déco</button>
+      </div>
+    </div>
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchAdminTab('articles',this)">Articles</button>
+      <button class="admin-tab" onclick="switchAdminTab('reservations',this)">Réservations<span class="notif-badge" id="resa-tab-badge" style="display:none">0</span></button>
+      <button class="admin-tab" onclick="switchAdminTab('promos',this)">Codes promo</button>
+      <button class="admin-tab" onclick="switchAdminTab('newsletter',this)">Newsletter</button>
+      <button class="admin-tab" onclick="switchAdminTab('avis',this)">Avis</button>
+      <button class="admin-tab" onclick="switchAdminTab('livraison-admin',this)">Zone livraison</button>
+      <button class="admin-tab" onclick="switchAdminTab('profil',this)">Profil</button>
+      <button class="admin-tab" onclick="switchAdminTab('parametres',this)">Paramètres</button>
+    </div>
+
+    <!-- ZONE LIVRAISON ADMIN -->
+    <div class="admin-panel" id="tab-livraison-admin">
+      <div class="add-form-card">
+        <div class="add-form-title">Zone de livraison — carte interactive</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:1rem;line-height:1.7">
+          <strong>Comment ça marche :</strong><br>
+          🖱️ <b>Cliquez</b> sur la carte pour ajouter un point de délimitation<br>
+          🔄 <b>Glissez</b> les points pour les déplacer<br>
+          🗑️ <b>Double-cliquez</b> sur un point pour le supprimer<br>
+          💾 Cliquez <b>Enregistrer</b> pour sauvegarder la zone
+        </div>
+        <div id="admin-map" style="height:420px;border-radius:var(--radius);border:0.5px solid var(--border);margin-bottom:1rem"></div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+          <button class="btn-sm success" onclick="saveDeliveryZone()"><i class="ti ti-device-floppy" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Enregistrer la zone</button>
+          <button class="btn-sm danger" onclick="resetDeliveryZone()"><i class="ti ti-trash" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Réinitialiser</button>
+        </div>
+        <div id="zone-save-msg" style="font-size:11px;color:var(--green);margin-top:.6rem;display:none">✓ Zone enregistrée !</div>
+      </div>
+    </div>
+
+    <!-- RÉSERVATIONS -->
+    <div class="admin-panel" id="tab-reservations">
+      <div class="add-form-card">
+        <div class="add-form-title">Réservations reçues</div>
+        <div id="resa-admin-list"><div style="color:var(--text2);font-size:12px;text-align:center;padding:2rem 0">Aucune réservation pour l'instant.</div></div>
+        <button class="btn-sm danger" style="margin-top:1rem" onclick="clearResaNotifs()">Tout marquer comme lu</button>
+      </div>
+    </div>
+
+    <!-- ARTICLES -->
+    <div class="admin-panel active" id="tab-articles">
+      <div class="add-form-card">
+        <div class="add-form-title">Ajouter un article</div>
+        <div class="form-grid">
+          <div class="admin-form-group"><label>Marque *</label><input type="text" id="f-brand" placeholder="ex: Moncler"></div>
+          <div class="admin-form-group"><label>Nom *</label><input type="text" id="f-name" placeholder="ex: Doudoune Maya"></div>
+          <div class="admin-form-group"><label>Taille</label><input type="text" id="f-size" placeholder="M, L, 42..."></div>
+          <div class="admin-form-group"><label>Catégorie</label>
+            <select id="f-cat"><option value="Vestes">Vestes / Manteaux</option><option value="Pulls">Pulls</option><option value="Pantalons">Pantalons</option><option value="Chaussures">Chaussures</option><option value="Tshirts">T-shirts</option></select>
+          </div>
+          <div class="admin-form-group"><label>Statut</label>
+            <select id="f-status"><option value="dispo">Disponible</option><option value="vendu">Vendu</option></select>
+          </div>
+          <div class="admin-form-group"><label>Prix affiché (€, optionnel)</label><input type="number" id="f-price" placeholder="ex: 150" min="0"></div>
+          <div class="admin-form-group span2"><label>Description</label><textarea id="f-desc" rows="2" placeholder="Couleur, état, détails..."></textarea></div>
+          <div class="admin-form-group span2">
+            <label>Photos (compressées auto)</label>
+            <div class="img-upload-area" onclick="document.getElementById('f-photos').click()">
+              <i class="ti ti-photo-plus" style="font-size:16px"></i><span>Cliquez pour ajouter des photos</span>
+            </div>
+            <input type="file" id="f-photos" accept="image/*" multiple style="display:none" onchange="handlePhotos(this)">
+            <div class="img-preview" id="photo-preview"></div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" style="width:auto;padding:9px 22px" onclick="addArticle()">Ajouter l'article</button>
+          <button class="btn-sm" onclick="clearForm()">Annuler</button>
+        </div>
+        <div class="success-msg" id="add-success">✓ Article sauvegardé !</div>
+        <div class="error-msg" id="add-error"></div>
+      </div>
+      <div class="admin-article-list" id="admin-article-list"></div>
+      <div id="empty-admin" style="text-align:center;padding:3rem 0;color:var(--text2);font-size:13px;display:none">Aucun article.</div>
+    </div>
+
+    <!-- CODES PROMO -->
+    <div class="admin-panel" id="tab-promos">
+      <div class="add-form-card">
+        <div class="add-form-title">Créer un code promo</div>
+        <div class="form-grid">
+          <div class="admin-form-group"><label>Code *</label><input type="text" id="p-code" placeholder="ex: SOLDES20" style="text-transform:uppercase;letter-spacing:2px"></div>
+          <div class="admin-form-group"><label>Réduction (%)</label><input type="number" id="p-pct" placeholder="ex: 20" min="1" max="100"></div>
+          <div class="admin-form-group"><label>Utilisations max (0 = illimitées)</label><input type="number" id="p-maxuses" placeholder="0" min="0" value="0"></div>
+          <div class="admin-form-group"><label>Date d'expiration</label><input type="date" id="p-expiry"></div>
+          <div class="admin-form-group span2"><label>Description (optionnel)</label><input type="text" id="p-desc" placeholder="Ex: Soldes d'été 2025"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" style="width:auto;padding:9px 22px" onclick="addPromoCode()">Créer le code</button>
+        </div>
+        <div class="success-msg" id="promo-success">✓ Code créé !</div>
+      </div>
+      <div class="promo-list" id="admin-promo-list"></div>
+      <div id="empty-promos" style="text-align:center;padding:2rem 0;color:var(--text2);font-size:13px;display:none">Aucun code promo.</div>
+    </div>
+
+    <!-- NEWSLETTER -->
+    <div class="admin-panel" id="tab-newsletter">
+      <div class="add-form-card">
+        <div class="add-form-title">Abonnés newsletter</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem">
+          <span id="abonnes-count" style="font-size:12px;color:var(--text2)"></span>
+          <button class="btn-sm success" onclick="exportEmails()"><i class="ti ti-download" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Exporter emails</button>
+        </div>
+        <div class="abonnes-list" id="abonnes-list"></div>
+        <div id="empty-abonnes" style="text-align:center;padding:2rem 0;color:var(--text2);font-size:13px;display:none">Aucun abonné.</div>
+      </div>
+      <div class="newsletter-send-card">
+        <div class="add-form-title">Envoyer une annonce (copiez pour votre email)</div>
+        <div class="form-grid">
+          <div class="admin-form-group span2"><label>Sujet</label><input type="text" id="nl-sujet" placeholder="ex: Nouveaux articles disponibles !"></div>
+          <div class="admin-form-group span2"><label>Message</label><textarea id="nl-message" rows="4" placeholder="Écrivez votre message ici..."></textarea></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" style="width:auto;padding:9px 22px" onclick="copyEmailDraft()">Copier le brouillon</button>
+        </div>
+        <div class="success-msg" id="nl-copy-ok">✓ Brouillon copié dans le presse-papier !</div>
+      </div>
+    </div>
+
+    <!-- AVIS -->
+    <div class="admin-panel" id="tab-avis">
+      <div class="add-form-card">
+        <div class="add-form-title">Ajouter un avis</div>
+        <div class="form-grid">
+          <div class="admin-form-group"><label>Nom du client</label><input type="text" id="av-name" placeholder="ex: Pierre M."></div>
+          <div class="admin-form-group"><label>Plateforme</label>
+            <select id="av-plat"><option value="Vinted">Vinted</option><option value="Instagram">Instagram</option><option value="WhatsApp">WhatsApp</option><option value="Leboncoin">Leboncoin</option><option value="Autre">Autre</option></select>
+          </div>
+          <div class="admin-form-group span2"><label>Note</label>
+            <div class="star-selector" id="star-selector">
+              <i class="ti ti-star" onclick="setStars(1)"></i><i class="ti ti-star" onclick="setStars(2)"></i>
+              <i class="ti ti-star" onclick="setStars(3)"></i><i class="ti ti-star" onclick="setStars(4)"></i>
+              <i class="ti ti-star" onclick="setStars(5)"></i>
+            </div>
+          </div>
+          <div class="admin-form-group span2"><label>Commentaire</label><textarea id="av-text" rows="2" placeholder="Ce que le client a dit..."></textarea></div>
+          <div class="admin-form-group span2">
+            <label>Photo de preuve</label>
+            <div class="img-upload-area" onclick="document.getElementById('av-photo').click()">
+              <i class="ti ti-screenshot" style="font-size:16px"></i><span>Capture d'écran</span>
+            </div>
+            <input type="file" id="av-photo" accept="image/*" style="display:none" onchange="handleAvisPhoto(this)">
+            <div class="img-preview" id="avis-preview"></div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" style="width:auto;padding:9px 22px" onclick="addAvis()">Ajouter</button>
+          <button class="btn-sm" onclick="clearAvisForm()">Annuler</button>
+        </div>
+        <div class="success-msg" id="avis-success">✓ Avis ajouté !</div>
+      </div>
+      <div class="admin-avis-list" id="admin-avis-list"></div>
+      <div id="empty-avis-admin" style="text-align:center;padding:2rem 0;color:var(--text2);font-size:13px;display:none">Aucun avis.</div>
+    </div>
+
+    <!-- PROFIL -->
+    <div class="admin-panel" id="tab-profil">
+      <div class="profil-card">
+        <div class="profil-title">Informations publiques</div>
+        <div class="form-grid" style="margin-bottom:1rem">
+          <div class="admin-form-group span2"><label>Nom / Pseudo</label><input type="text" id="p-name" placeholder="AlpeStyle 74"></div>
+          <div class="admin-form-group span2"><label>Bio</label><textarea id="p-bio" rows="3" placeholder="Décrivez-vous..."></textarea></div>
+          <div class="admin-form-group"><label>WhatsApp</label><input type="text" id="p-phone" placeholder="+33 6 12 34 56 78"></div>
+          <div class="admin-form-group"><label>Instagram</label><input type="text" id="p-insta" placeholder="@alpestyle74"></div>
+          <div class="admin-form-group"><label>Email</label><input type="email" id="p-email" placeholder="contact@..."></div>
+          <div class="admin-form-group"><label>Vinted (lien)</label><input type="text" id="p-vinted" placeholder="https://www.vinted.fr/..."></div>
+          <div class="admin-form-group span2"><label>Message bannière promo (laissez vide pour cacher)</label><input type="text" id="p-banner" placeholder="ex: 🔥 Soldes — jusqu'à -30% avec le code SOLDES30"></div>
+          <div class="admin-form-group span2">
+            <label>Photo de profil</label>
+            <div class="img-upload-area" onclick="document.getElementById('p-photo').click()">
+              <i class="ti ti-user-circle" style="font-size:16px"></i><span>Choisir une photo</span>
+            </div>
+            <input type="file" id="p-photo" accept="image/*" style="display:none" onchange="handleProfilPhoto(this)">
+          </div>
+        </div>
+        <button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveProfil()">Enregistrer</button>
+        <div class="success-msg" id="profil-success">✓ Profil mis à jour !</div>
+      </div>
+    </div>
+
+    <!-- PARAMÈTRES -->
+    <div class="admin-panel" id="tab-parametres">
+      <div class="profil-card">
+        <div class="profil-title">Changer les identifiants</div>
+        <div style="margin-bottom:1rem">
+          <div class="admin-form-group" style="margin-bottom:.75rem"><label>Nouvel identifiant</label><input type="text" id="new-user"></div>
+          <div class="admin-form-group" style="margin-bottom:.75rem"><label>Nouveau mot de passe</label><input type="password" id="new-pass"></div>
+          <div class="admin-form-group"><label>Confirmer</label><input type="password" id="new-pass2"></div>
+        </div>
+        <button class="btn-primary" style="width:auto;padding:9px 22px" onclick="saveCreds()">Mettre à jour</button>
+        <div class="success-msg" id="creds-success">✓ Identifiants mis à jour !</div>
+        <div class="error-msg" id="creds-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FICHE PRODUIT -->
+<div class="fiche-overlay" id="fiche-overlay" onclick="closeFicheOutside(event)">
+  <div class="fiche-panel" id="fiche-panel">
+    <div class="fiche-inner">
+      <div class="fiche-gallery">
+        <div class="fiche-main-img" id="fiche-main-img" onclick="openLightboxFiche()">
+          <i class="ti ti-shirt card-icon-placeholder" id="fiche-placeholder"></i>
+        </div>
+        <button class="fiche-gallery-arrow prev" id="fiche-prev" onclick="ficheGalleryNav(-1)" style="display:none"><i class="ti ti-chevron-left"></i></button>
+        <button class="fiche-gallery-arrow next" id="fiche-next" onclick="ficheGalleryNav(1)" style="display:none"><i class="ti ti-chevron-right"></i></button>
+        <div class="fiche-thumbs" id="fiche-thumbs" style="display:none"></div>
+      </div>
+      <div class="fiche-info">
+        <button class="fiche-back" onclick="closeFiche()"><i class="ti ti-arrow-left"></i> Retour</button>
+        <span class="fiche-status" id="fiche-status"></span>
+        <div class="fiche-brand" id="fiche-brand"></div>
+        <div class="fiche-name" id="fiche-name"></div>
+        <div class="fiche-metas" id="fiche-metas"></div>
+        <div class="fiche-price-block" id="fiche-price-block" style="display:none">
+          <div class="fiche-price-label">Prix</div>
+          <div class="fiche-price-row" id="fiche-price-row"></div>
+        </div>
+        <div class="fiche-desc" id="fiche-desc"></div>
+
+        <!-- BOUTON RÉSERVER + PAYPAL -->
+        <div id="fiche-resa-wrap"></div>
+        <div id="fiche-paypal-wrap" style="margin-top:.5rem;display:none">
+          <a id="fiche-paypal-btn" href="#" target="_blank" class="btn-paypal">
+            <i class="ti ti-brand-paypal" style="font-size:13px;vertical-align:-2px;margin-right:5px"></i>Payer via PayPal
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RÉSERVATION -->
+<div class="resa-overlay" id="resa-overlay" onclick="closeResaOutside(event)">
+  <div class="resa-panel">
+    <div class="resa-header">
+      <div class="resa-title">Réserver cet article</div>
+      <button class="resa-close" onclick="closeResa()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="resa-article" id="resa-article-info"></div>
+    <div class="resa-form">
+      <div class="resa-group">
+        <label>Votre prénom *</label>
+        <input type="text" id="resa-prenom" placeholder="ex: Thomas">
+      </div>
+      <div class="resa-group">
+        <label>Votre email *</label>
+        <input type="email" id="resa-email" placeholder="votre@email.com">
+      </div>
+      <div class="resa-group">
+        <label>Message (optionnel)</label>
+        <textarea id="resa-message" rows="3" placeholder="Question, disponibilité, mode de paiement…"></textarea>
+      </div>
+      <button class="resa-submit" id="resa-submit" onclick="sendResa()">
+        <i class="ti ti-calendar-check" style="font-size:13px;vertical-align:-2px;margin-right:5px"></i>Confirmer la réservation
+      </button>
+      <div class="resa-ok" id="resa-ok">✓ Réservation envoyée ! On vous recontacte très vite.</div>
+      <div class="resa-err" id="resa-err"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()"><i class="ti ti-x"></i></button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// ÉTAT GLOBAL
+// ════════════════════════════════════════════════════════
+let articles=[], avisList=[], promos=[], abonnes=[];
+let profil=lsGet('as74_profil',{name:'AlpeStyle 74',bio:'Passionné de mode et de belles pièces, je propose une sélection soignée de vêtements masculins de grandes marques, basé en Haute-Savoie.',phone:'',insta:'',email:'',vinted:'',photo:'',banner:''});
+let creds=lsGet('as74_creds',{user:'admin',pass:'alpestyle74'});
+let loggedIn=false;
+let pendingPhotos=[], pendingAvisPhoto='', selectedStars=5;
+let currentFilter='all', currentSearch='', currentSize='all';
+let fichePhotos=[], fichePhotoIdx=0;
+let activePromo=null;
+
+// ════════════════════════════════════════════════════════
+// SYNC BAR
+// ════════════════════════════════════════════════════════
+let syncTimer=null;
+function showSync(msg,type){
+  const bar=document.getElementById('sync-bar');
+  bar.textContent=msg;bar.className='sync-bar show '+type;
+  clearTimeout(syncTimer);
+  if(type==='ok'||type==='err')syncTimer=setTimeout(()=>bar.classList.remove('show'),2500);
+}
+
+// ════════════════════════════════════════════════════════
+// COMPRESSION IMAGE
+// ════════════════════════════════════════════════════════
+function compressImage(dataUrl,maxW,quality){
+  maxW=maxW||900;quality=quality||0.70;
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement('canvas');
+      var w=img.width,h=img.height;
+      if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=function(){resolve(dataUrl);};
+    img.src=dataUrl;
+  });
+}
+
+// ════════════════════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════════════════════
+function showPage(page,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(page==='vitrine')renderPublicGrid();
+  if(page==='avis')renderAvisPage();
+  if(page==='apropos')renderApropos();
+  if(page==='livraison')initPublicMap();
+  if(page==='admin'){renderAdminList();renderResaAdmin();}
+}
+
+// ════════════════════════════════════════════════════════
+// MODE SOMBRE
+// ════════════════════════════════════════════════════════
+function toggleTheme(){
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const newTheme=isDark?'light':'dark';
+  document.documentElement.setAttribute('data-theme',newTheme);
+  localStorage.setItem('as74_theme',newTheme);
+  document.getElementById('theme-icon').className=isDark?'ti ti-moon':'ti ti-sun';
+}
+(function initTheme(){
+  const saved=localStorage.getItem('as74_theme')||'light';
+  if(saved==='dark'){
+    document.documentElement.setAttribute('data-theme','dark');
+    const ic=document.getElementById('theme-icon');
+    if(ic)ic.className='ti ti-sun';
+  }
+})();
+
+// ════════════════════════════════════════════════════════
+// NOTIFICATIONS RÉSERVATIONS (localStorage)
+// ════════════════════════════════════════════════════════
+function addResaNotif(data){
+  const list=JSON.parse(localStorage.getItem('as74_resas')||'[]');
+  list.unshift({...data, ts:Date.now(), read:false});
+  if(list.length>50)list.length=50;
+  localStorage.setItem('as74_resas',JSON.stringify(list));
+  updateResaBadge();
+}
+function updateResaBadge(){
+  const list=JSON.parse(localStorage.getItem('as74_resas')||'[]');
+  const unread=list.filter(r=>!r.read).length;
+  const badge=document.getElementById('notif-badge');
+  const tabBadge=document.getElementById('resa-tab-badge');
+  if(badge){badge.style.display=unread?'inline-flex':'none';badge.textContent=unread;}
+  if(tabBadge){tabBadge.style.display=unread?'inline-flex':'none';tabBadge.textContent=unread;}
+}
+function renderResaAdmin(){
+  const list=JSON.parse(localStorage.getItem('as74_resas')||'[]');
+  const el=document.getElementById('resa-admin-list');if(!el)return;
+  if(!list.length){el.innerHTML='<div style="color:var(--text2);font-size:12px;text-align:center;padding:2rem 0">Aucune réservation pour l\'instant.</div>';return;}
+  el.innerHTML=list.map((r,i)=>`
+    <div style="border:0.5px solid var(--border);border-radius:2px;padding:.9rem 1rem;margin-bottom:.6rem;background:${r.read?'var(--bg)':'var(--white)'};position:relative">
+      ${!r.read?'<span style="position:absolute;top:10px;right:10px;width:7px;height:7px;background:var(--red);border-radius:50%;display:block"></span>':''}
+      <div style="font-size:11px;font-weight:500;margin-bottom:4px">${esc(r.prenom||'?')} — <a href="mailto:${esc(r.email)}" style="color:var(--accent)">${esc(r.email)}</a></div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:3px">Article : <strong style="color:var(--text)">${esc(r.article||'?')}</strong> · Taille ${esc(r.taille||'N/A')}${r.prix?' · '+esc(r.prix):''}</div>
+      ${r.message&&r.message!=='(aucun message)'?`<div style="font-size:11px;color:var(--text2);font-style:italic">"${esc(r.message)}"</div>`:''}
+      <div style="font-size:9px;color:var(--text2);margin-top:5px;letter-spacing:1px">${new Date(r.ts).toLocaleString('fr-FR')}</div>
+    </div>`).join('');
+}
+function clearResaNotifs(){
+  const list=JSON.parse(localStorage.getItem('as74_resas')||'[]');
+  list.forEach(r=>r.read=true);
+  localStorage.setItem('as74_resas',JSON.stringify(list));
+  updateResaBadge();
+  renderResaAdmin();
+}
+function handleAdminBtn(){loggedIn?showPage('admin',null):showPage('login',null)}
+function doLogin(){
+  const u=document.getElementById('login-user').value.trim();
+  const p=document.getElementById('login-pass').value;
+  if(u===creds.user&&p===creds.pass){
+    loggedIn=true;
+    document.getElementById('admin-nav-btn').innerHTML='<i class="ti ti-lock-open" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Admin';
+    loadProfilForm();showPage('admin',null);
+  }else{document.getElementById('login-error').style.display='block'}
+}
+function doLogout(){
+  loggedIn=false;
+  document.getElementById('admin-nav-btn').innerHTML='<i class="ti ti-lock" style="font-size:11px;vertical-align:-1px;margin-right:3px"></i>Admin';
+  showPage('vitrine',document.querySelector('.nav-link'));
+}
+
+// ════════════════════════════════════════════════════════
+// CODE PROMO (côté public)
+// ════════════════════════════════════════════════════════
+function applyPromo(){
+  const code=document.getElementById('promo-code-input').value.trim().toUpperCase();
+  const msg=document.getElementById('promo-msg');
+  const tag=document.getElementById('promo-active-tag');
+  if(!code){msg.className='promo-msg err';msg.textContent='Entrez un code.';return}
+  const now=new Date();
+  const promo=promos.find(p=>{
+    if(p.code!==code)return false;
+    if(!p.active)return false;
+    if(p.expiry&&new Date(p.expiry)<now)return false;
+    if(p.maxUses>0&&p.uses>=p.maxUses)return false;
+    return true;
+  });
+  if(!promo){msg.className='promo-msg err';msg.textContent='Code invalide ou expiré.';tag.style.display='none';activePromo=null;renderPublicGrid();return}
+  activePromo={code:promo.code,pct:promo.pct,id:promo.id};
+  msg.className='promo-msg ok';msg.textContent='-'+promo.pct+'% appliqué sur les prix affichés !';
+  tag.textContent='✓ -'+promo.pct+'% actif · Retirer';tag.style.display='inline-block';
+  document.getElementById('promo-code-input').value='';
+  renderPublicGrid();
+  // incrémenter usage
+  const p2=promos.find(x=>x.id===promo.id);
+  if(p2){p2.uses=(p2.uses||0)+1;dbPut('promos',p2);}
+}
+function removePromo(){
+  activePromo=null;
+  document.getElementById('promo-msg').textContent='';
+  document.getElementById('promo-active-tag').style.display='none';
+  renderPublicGrid();
+}
+
+// ════════════════════════════════════════════════════════
+// VITRINE
+// ════════════════════════════════════════════════════════
+function calcPrice(article){
+  if(!article.price||article.price<=0)return null;
+  if(!activePromo)return{final:article.price,orig:null,pct:0};
+  const final=Math.round(article.price*(1-activePromo.pct/100));
+  return{final,orig:article.price,pct:activePromo.pct};
+}
+function getFiltered(){
+  let list=[...articles];
+  // disponibles toujours en premier
+  list.sort((a,b)=>{
+    if(a.status==='dispo'&&b.status!=='dispo')return -1;
+    if(a.status!=='dispo'&&b.status==='dispo')return 1;
+    return b.id-a.id;
+  });
+  if(currentFilter==='dispo')list=list.filter(a=>a.status==='dispo');
+  else if(currentFilter==='vendu')list=list.filter(a=>a.status==='vendu');
+  else if(currentFilter.startsWith('cat:'))list=list.filter(a=>a.cat===currentFilter.slice(4));
+  if(currentSize!=='all')list=list.filter(a=>(a.size||'').toUpperCase()===currentSize);
+  if(currentSearch){const q=currentSearch.toLowerCase();list=list.filter(a=>(a.brand||'').toLowerCase().includes(q)||(a.name||'').toLowerCase().includes(q))}
+  return list;
+}
+function filterSize(s){
+  currentSize=s;
+  renderPublicGrid();
+}
+// retour en haut
+window.addEventListener('scroll',()=>{
+  const btn=document.getElementById('back-to-top');
+  if(btn)btn.classList.toggle('show',window.scrollY>300);
+});
+function renderPublicGrid(){
+  // bannière
+  const banner=document.getElementById('promo-banner');
+  if(profil.banner){banner.textContent=profil.banner;banner.classList.add('show')}else{banner.classList.remove('show')}
+  const grid=document.getElementById('public-grid');
+  document.getElementById('stat-dispo').textContent=articles.filter(a=>a.status==='dispo').length;
+  document.getElementById('stat-vendu').textContent=articles.filter(a=>a.status==='vendu').length;
+  document.getElementById('stat-total').textContent=articles.length;
+  const filtered=getFiltered();
+  if(!filtered.length){grid.innerHTML='<div class="empty-state">Aucun article à afficher.</div>';return}
+  grid.innerHTML=filtered.map(a=>{
+    const p=calcPrice(a);
+    const priceHtml=p?`<div class="card-price">${p.orig?`<span class="price-original">${p.orig}€</span><span class="price-promo">${p.final}€</span>`:`<span class="price-normal">${p.final}€</span>`}</div>`:'';
+    const promoBadge=a.price&&activePromo?`<div class="promo-badge">-${activePromo.pct}%</div>`:'';
+    return`<div class="card ${a.status==='vendu'?'sold':''}" onclick="openFiche(${a.id})">
+      <div class="card-img">
+        ${promoBadge}
+        ${a.photos&&a.photos[0]?`<img src="${a.photos[0]}" alt="${esc(a.name)}">`:`<i class="ti ti-shirt card-icon-placeholder"></i>`}
+        ${a.status==='vendu'?`<div class="sold-overlay"><span class="sold-tag">Vendu</span></div>`:''}
+      </div>
+      <div class="card-body">
+        <div class="card-brand">${esc(a.brand)}</div>
+        <div class="card-name">${esc(a.name)}</div>
+        <div class="card-meta">${a.size?`<span><i class="ti ti-ruler-2" style="font-size:10px;vertical-align:-1px"></i> ${esc(a.size)}</span>`:''} ${a.cat?`<span class="card-cat">${esc(a.cat)}</span>`:''}</div>
+        ${priceHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+function filterGrid(f,btn){
+  currentFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');renderPublicGrid();
+}
+function onSearch(){currentSearch=document.getElementById('search-input').value.trim();renderPublicGrid()}
+
+// ════════════════════════════════════════════════════════
+// NEWSLETTER (public)
+// ════════════════════════════════════════════════════════
+async function subscribeNewsletter(){
+  const email=document.getElementById('nl-email').value.trim();
+  if(!email||!email.includes('@')){alert('Email invalide.');return}
+  if(abonnes.find(a=>a.email===email)){
+    document.getElementById('nl-ok').style.display='block';
+    document.getElementById('nl-ok').textContent='✓ Vous êtes déjà inscrit !';
+    return;
+  }
+  const abonne={id:Date.now(),email,date:new Date().toISOString()};
+  abonnes.push(abonne);
+  await dbPut('abonnes',abonne);
+  document.getElementById('nl-email').value='';
+  document.getElementById('nl-ok').style.display='block';
+  setTimeout(()=>document.getElementById('nl-ok').style.display='none',3500);
+}
+
+// ════════════════════════════════════════════════════════
+// FICHE PRODUIT
+// ════════════════════════════════════════════════════════
+function openFiche(id){
+  const a=articles.find(x=>x.id===id);if(!a)return;
+  fichePhotos=a.photos&&a.photos.length?a.photos:[];fichePhotoIdx=0;
+  const mainImg=document.getElementById('fiche-main-img');
+  mainImg.querySelectorAll('img').forEach(i=>i.remove());
+  const ph=document.getElementById('fiche-placeholder');
+  if(fichePhotos.length){ph.style.display='none';const img=document.createElement('img');img.src=fichePhotos[0];img.alt=a.name;mainImg.appendChild(img)}
+  else{ph.style.display=''}
+  const prev=document.getElementById('fiche-prev'),next=document.getElementById('fiche-next');
+  prev.style.display=fichePhotos.length>1?'flex':'none';next.style.display=fichePhotos.length>1?'flex':'none';
+  const thumbs=document.getElementById('fiche-thumbs');
+  if(fichePhotos.length>1){thumbs.style.display='flex';thumbs.innerHTML=fichePhotos.map((p,i)=>`<div class="fiche-thumb ${i===0?'active':''}" onclick="ficheGallerySet(${i})"><img src="${p}" alt=""></div>`).join('')}
+  else{thumbs.style.display='none'}
+  document.getElementById('fiche-status').className='fiche-status '+(a.status==='dispo'?'dispo':'vendu');
+  document.getElementById('fiche-status').innerHTML=a.status==='dispo'?'<i class="ti ti-check" style="font-size:10px"></i> Disponible':'<i class="ti ti-x" style="font-size:10px"></i> Vendu';
+  document.getElementById('fiche-brand').textContent=a.brand||'';
+  document.getElementById('fiche-name').textContent=a.name||'';
+  let metas='';
+  if(a.size)metas+=`<div class="fiche-meta-row"><span class="fiche-meta-label">Taille</span><span class="fiche-meta-val">${esc(a.size)}</span></div>`;
+  if(a.cat)metas+=`<div class="fiche-meta-row"><span class="fiche-meta-label">Catégorie</span><span class="fiche-meta-val">${esc(a.cat)}</span></div>`;
+  metas+=`<div class="fiche-meta-row"><span class="fiche-meta-label">Marque</span><span class="fiche-meta-val">${esc(a.brand)}</span></div>`;
+  document.getElementById('fiche-metas').innerHTML=metas;
+  document.getElementById('fiche-desc').textContent=a.desc||'';
+  document.getElementById('fiche-desc').style.display=a.desc?'block':'none';
+  // prix
+  const pb=document.getElementById('fiche-price-block');
+  const pr=document.getElementById('fiche-price-row');
+  const p=calcPrice(a);
+  if(p){pb.style.display='block';pr.innerHTML=p.orig?`<span class="fiche-price-orig">${p.orig}€</span><span class="fiche-price-final">${p.final}€</span><span class="fiche-promo-tag">-${p.pct}%</span>`:`<span class="fiche-price-normal">${p.final}€</span>`}
+  else{pb.style.display='none'}
+  // bouton réserver
+  const resaWrap=document.getElementById('fiche-resa-wrap');
+  if(a.status==='dispo'){
+    resaWrap.innerHTML=`<button class="btn-reserver" onclick="openResa(${a.id})"><i class="ti ti-calendar-check" style="font-size:13px;vertical-align:-2px"></i> Réserver cet article</button>`;
+  } else {
+    resaWrap.innerHTML=`<button class="btn-reserver vendu" disabled><i class="ti ti-x" style="font-size:13px;vertical-align:-2px"></i> Article vendu</button>`;
+  }
+  const overlay=document.getElementById('fiche-overlay');
+  overlay.classList.add('open');document.body.style.overflow='hidden';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>overlay.classList.add('visible')));
+}
+function closeFiche(){const o=document.getElementById('fiche-overlay');o.classList.remove('visible');setTimeout(()=>{o.classList.remove('open');document.body.style.overflow=''},300)}
+function closeFicheOutside(e){if(e.target===document.getElementById('fiche-overlay'))closeFiche()}
+
+// ════════════════════════════════════════════════════════
+// RÉSERVATION
+// ════════════════════════════════════════════════════════
+let _resaArticle=null;
+function openResa(id){
+  _resaArticle=articles.find(a=>a.id===id);if(!_resaArticle)return;
+  document.getElementById('resa-article-info').innerHTML=`<strong>${esc(_resaArticle.brand)} — ${esc(_resaArticle.name)}</strong><br>Taille : ${esc(_resaArticle.size)||'N/A'}${_resaArticle.price?` · Prix : ${_resaArticle.price}€`:''}`;
+  document.getElementById('resa-prenom').value='';
+  document.getElementById('resa-email').value='';
+  document.getElementById('resa-message').value='';
+  document.getElementById('resa-ok').style.display='none';
+  document.getElementById('resa-err').style.display='none';
+  document.getElementById('resa-submit').disabled=false;
+  document.getElementById('resa-submit').textContent='Confirmer la réservation';
+  const o=document.getElementById('resa-overlay');
+  o.classList.add('open');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>o.classList.add('visible')));
+}
+function closeResa(){const o=document.getElementById('resa-overlay');o.classList.remove('visible');setTimeout(()=>o.classList.remove('open'),250)}
+function closeResaOutside(e){if(e.target===document.getElementById('resa-overlay'))closeResa()}
+
+async function sendResa(){
+  const prenom=document.getElementById('resa-prenom').value.trim();
+  const email=document.getElementById('resa-email').value.trim();
+  const message=document.getElementById('resa-message').value.trim();
+  const okEl=document.getElementById('resa-ok');
+  const errEl=document.getElementById('resa-err');
+  const btn=document.getElementById('resa-submit');
+  okEl.style.display='none';errEl.style.display='none';
+  if(!prenom||!email){errEl.textContent='Prénom et email obligatoires.';errEl.style.display='block';return;}
+  if(!email.includes('@')){errEl.textContent='Email invalide.';errEl.style.display='block';return;}
+  btn.disabled=true;btn.textContent='Envoi en cours…';
+  const a=_resaArticle;
+  try{
+    const res=await fetch('https://api.web3forms.com/submit',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({
+        access_key:'c710f90f-bdcb-4177-91ed-417e016d337d',
+        subject:`🔴 URGENT — Réservation : ${a.brand} ${a.name} (Taille ${a.size||'N/A'})`,
+        from_name:'AlpeStyle74 — Réservation',
+        email:email,
+        prenom:prenom,
+        article:`${a.brand} — ${a.name}`,
+        taille:a.size||'N/A',
+        prix:a.price?a.price+'€':'Non renseigné',
+        message:message||'(aucun message)',
+      })
+    });
+    const data=await res.json();
+    if(data.success){
+      addResaNotif({prenom,email,article:`${a.brand} — ${a.name}`,taille:a.size||'N/A',prix:a.price?a.price+'€':'',message:message||'(aucun message)'});
+      okEl.style.display='block';
+      btn.style.display='none';
+    }else{
+      errEl.textContent='Erreur : '+data.message;errEl.style.display='block';
+      btn.disabled=false;btn.textContent='Confirmer la réservation';
+    }
+  }catch(e){
+    errEl.textContent='Erreur réseau, réessayez.';errEl.style.display='block';
+    btn.disabled=false;btn.textContent='Confirmer la réservation';
+  }
+}
+function ficheGalleryNav(dir){fichePhotoIdx=(fichePhotoIdx+dir+fichePhotos.length)%fichePhotos.length;ficheGallerySet(fichePhotoIdx)}
+function ficheGallerySet(idx){fichePhotoIdx=idx;const img=document.getElementById('fiche-main-img').querySelector('img');if(img)img.src=fichePhotos[idx];document.querySelectorAll('.fiche-thumb').forEach((t,i)=>t.classList.toggle('active',i===idx))}
+function openLightboxFiche(){if(!fichePhotos.length)return;openLightbox(fichePhotos[fichePhotoIdx])}
+function openLightbox(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').classList.add('open')}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('open')}
+
+// ════════════════════════════════════════════════════════
+// AVIS PAGE
+// ════════════════════════════════════════════════════════
+function starsHtml(n,size){size=size||13;let h='';for(let i=1;i<=5;i++)h+=`<i class="ti ti-star${i<=n?'-filled':''}" style="font-size:${size}px;color:${i<=n?'var(--gold)':'var(--border2)'}"></i>`;return h}
+function fmtDate(ts){if(!ts)return'';return new Date(ts).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}
+function renderAvisPage(){
+  const empty=document.getElementById('avis-empty'),list=document.getElementById('avis-public-list');
+  const sb=document.getElementById('avis-score-block'),pb=document.getElementById('avis-platforms-block');
+  const sorted=[...avisList].sort((a,b)=>b.id-a.id);
+  if(!sorted.length){empty.style.display='block';list.innerHTML='';sb.innerHTML='';pb.innerHTML='';return}
+  empty.style.display='none';
+  const avg=avisList.reduce((s,a)=>s+a.stars,0)/avisList.length;
+  sb.innerHTML=`<div class="avis-header-block"><div class="avis-score-big">${avg.toFixed(1)}</div><div class="avis-stars-big">${starsHtml(Math.round(avg),22)}</div><div class="avis-count">${avisList.length} avis · ${articles.filter(a=>a.status==='vendu').length} ventes</div></div>`;
+  const plats={};avisList.forEach(a=>{if(!plats[a.plat])plats[a.plat]={count:0,stars:0};plats[a.plat].count++;plats[a.plat].stars+=a.stars});
+  const platKeys=Object.keys(plats);
+  pb.innerHTML=platKeys.length>1?`<div class="avis-platforms">${platKeys.map(k=>`<div class="avis-plat"><div class="avis-plat-name">${esc(k)}</div><div class="avis-plat-num">${plats[k].count}</div><div class="avis-plat-stars">${starsHtml(Math.round(plats[k].stars/plats[k].count),10)}</div></div>`).join('')}</div>`:'';
+  list.innerHTML=sorted.map(a=>`<div class="avis-item"><div class="avis-item-photo ${a.photo?'':'no-photo'}" ${a.photo?`onclick="openLightbox('${a.photo}')" title="Voir la preuve"`:'style="cursor:default"'}>${a.photo?`<img src="${a.photo}" alt="">`:`<i class="ti ti-star"></i>`}</div><div class="avis-item-body"><div class="avis-item-top"><span class="avis-item-name">${esc(a.clientName||'Client anonyme')}</span><span class="avis-item-stars">${starsHtml(a.stars,12)}</span><span class="avis-item-plat">${esc(a.plat)}</span><span class="avis-item-date">${fmtDate(a.id)}</span></div>${a.text?`<div class="avis-item-text">"${esc(a.text)}"</div>`:''}</div></div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// À PROPOS
+// ════════════════════════════════════════════════════════
+function renderApropos(){
+  document.getElementById('pub-name').textContent=profil.name||'AlpeStyle 74';
+  document.getElementById('pub-bio').textContent=profil.bio||'';
+  const initials=(profil.name||'A').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const av=document.getElementById('pub-avatar-wrap');av.innerHTML=profil.photo?`<img src="${profil.photo}" alt="">`:`<span>${initials}</span>`;
+  const c=document.getElementById('pub-contact');let h='';
+  if(profil.phone){const n=profil.phone.replace(/\s/g,'').replace(/^\+/,'').replace(/^0/,'33');h+=`<a class="contact-btn whatsapp" href="https://wa.me/${n}" target="_blank"><i class="ti ti-brand-whatsapp"></i> WhatsApp</a>`}
+  if(profil.insta){const handle=profil.insta.replace('@','');h+=`<a class="contact-btn instagram" href="https://instagram.com/${handle}" target="_blank"><i class="ti ti-brand-instagram"></i> Instagram</a>`}
+  if(profil.email){h+=`<a class="contact-btn email" href="mailto:${esc(profil.email)}"><i class="ti ti-mail"></i> Email</a>`}
+  if(profil.vinted){h+=`<a class="contact-btn vinted" href="${esc(profil.vinted)}" target="_blank"><i class="ti ti-shopping-bag"></i> Vinted</a>`}
+  c.innerHTML=h;
+}
+
+// ════════════════════════════════════════════════════════
+// ADMIN — ARTICLES
+// ════════════════════════════════════════════════════════
+function handlePhotos(input){
+  Array.from(input.files).forEach(function(f){
+    var r=new FileReader();
+    r.onload=function(e){compressImage(e.target.result,900,0.70).then(function(c){pendingPhotos.push(c);renderPhotoPreviews()})};
+    r.readAsDataURL(f);
+  });
+  input.value='';
+}
+function renderPhotoPreviews(){document.getElementById('photo-preview').innerHTML=pendingPhotos.map((s,i)=>`<div class="img-preview-item"><img src="${s}"><button class="img-preview-remove" onclick="removePhoto(${i})">×</button></div>`).join('')}
+function removePhoto(i){pendingPhotos.splice(i,1);renderPhotoPreviews()}
+async function addArticle(){
+  const brand=document.getElementById('f-brand').value.trim();
+  const name=document.getElementById('f-name').value.trim();
+  if(!brand||!name){alert('Marque et nom obligatoires.');return}
+  const article={id:Date.now(),brand,name,size:document.getElementById('f-size').value.trim(),cat:document.getElementById('f-cat').value,status:document.getElementById('f-status').value,price:parseFloat(document.getElementById('f-price').value)||0,desc:document.getElementById('f-desc').value.trim(),photos:pendingPhotos.slice()};
+  showSync('Sauvegarde…','saving');
+  try{
+    await dbPut('articles',article);
+    articles.unshift(article);
+    clearForm();renderAdminList();renderPublicGrid();
+    showSync('✓ Sauvegardé','ok');
+    const m=document.getElementById('add-success');m.style.display='block';setTimeout(()=>m.style.display='none',2500);
+  }catch(e){
+    console.error(e);
+    showSync('Erreur sauvegarde','err');
+    document.getElementById('add-error').textContent='Erreur : '+e.message;
+    document.getElementById('add-error').style.display='block';
+  }
+}
+function clearForm(){['f-brand','f-name','f-size','f-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-status').value='dispo';document.getElementById('f-cat').value='Vestes';document.getElementById('f-price').value='';pendingPhotos=[];document.getElementById('photo-preview').innerHTML=''}
+async function toggleStatus(id){
+  const a=articles.find(x=>x.id===id);if(!a)return;
+  a.status=a.status==='dispo'?'vendu':'dispo';
+  await dbPut('articles',a);renderAdminList();renderPublicGrid();
+}
+async function deleteArticle(id){
+  if(!confirm('Supprimer cet article ?'))return;
+  await dbDelete('articles',id);
+  articles=articles.filter(a=>a.id!==id);renderAdminList();renderPublicGrid();
+  showSync('✓ Supprimé','ok');
+}
+function renderAdminList(){
+  const list=document.getElementById('admin-article-list'),empty=document.getElementById('empty-admin');
+  if(!articles.length){list.innerHTML='';empty.style.display='block';return}
+  empty.style.display='none';
+  list.innerHTML=articles.map(a=>`<div class="admin-article-item ${a.status==='vendu'?'sold':''}">
+    <div class="admin-thumb">${a.photos&&a.photos[0]?`<img src="${a.photos[0]}" alt="">`:`<i class="ti ti-shirt"></i>`}</div>
+    <div class="admin-article-info"><div class="admin-article-brand">${esc(a.brand)}</div><div class="admin-article-name">${esc(a.name)}</div><div class="admin-article-meta">${a.size?esc(a.size):'—'}${a.cat?' · '+esc(a.cat):''}${a.price?' · '+a.price+'€':''}</div></div>
+    <span class="status-badge ${a.status}">${a.status==='dispo'?'Dispo':'Vendu'}</span>
+    <div class="admin-article-actions">
+      <button class="btn-sm" onclick="toggleStatus(${a.id})" title="Changer statut"><i class="ti ti-refresh" style="font-size:11px"></i></button>
+      <button class="btn-sm danger" onclick="deleteArticle(${a.id})"><i class="ti ti-trash" style="font-size:11px"></i></button>
+    </div>
+  </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// ADMIN — CODES PROMO
+// ════════════════════════════════════════════════════════
+async function addPromoCode(){
+  const code=document.getElementById('p-code').value.trim().toUpperCase();
+  const pct=parseInt(document.getElementById('p-pct').value)||0;
+  if(!code||pct<1||pct>100){alert('Code et pourcentage obligatoires (1-100%).');return}
+  const promo={id:Date.now(),code,pct,maxUses:parseInt(document.getElementById('p-maxuses').value)||0,expiry:document.getElementById('p-expiry').value||null,desc:document.getElementById('p-desc').value.trim(),uses:0,active:true};
+  await dbPut('promos',promo);
+  promos.unshift(promo);
+  ['p-code','p-pct','p-maxuses','p-expiry','p-desc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  renderAdminPromoList();
+  const m=document.getElementById('promo-success');m.style.display='block';setTimeout(()=>m.style.display='none',2500);
+}
+async function togglePromo(id){
+  const p=promos.find(x=>x.id===id);if(!p)return;
+  p.active=!p.active;await dbPut('promos',p);renderAdminPromoList();
+}
+async function deletePromo(id){
+  if(!confirm('Supprimer ce code ?'))return;
+  await dbDelete('promos',id);promos=promos.filter(p=>p.id!==id);renderAdminPromoList();
+}
+function renderAdminPromoList(){
+  const list=document.getElementById('admin-promo-list'),empty=document.getElementById('empty-promos');
+  if(!promos.length){list.innerHTML='';empty.style.display='block';return}
+  empty.style.display='none';
+  const now=new Date();
+  list.innerHTML=promos.map(p=>{
+    const expired=p.expiry&&new Date(p.expiry)<now;
+    const maxed=p.maxUses>0&&p.uses>=p.maxUses;
+    const isOk=p.active&&!expired&&!maxed;
+    return`<div class="promo-item">
+      <div class="promo-item-info">
+        <div class="promo-item-code">${esc(p.code)}</div>
+        <div class="promo-item-pct">-${p.pct}% ${p.desc?'· '+esc(p.desc):''}</div>
+        <div class="promo-item-uses">Utilisé ${p.uses||0} fois${p.maxUses>0?' / max '+p.maxUses:''} ${p.expiry?'· Expire: '+p.expiry:''}</div>
+      </div>
+      <span class="${isOk?'promo-active':'promo-inactive'}">${isOk?'Actif':expired?'Expiré':maxed?'Épuisé':'Désactivé'}</span>
+      <div style="display:flex;gap:.4rem">
+        <button class="btn-sm" onclick="togglePromo(${p.id})">${p.active?'Désactiver':'Activer'}</button>
+        <button class="btn-sm danger" onclick="deletePromo(${p.id})"><i class="ti ti-trash" style="font-size:11px"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// ADMIN — NEWSLETTER
+// ════════════════════════════════════════════════════════
+function renderAbonnesList(){
+  const list=document.getElementById('abonnes-list'),empty=document.getElementById('empty-abonnes');
+  document.getElementById('abonnes-count').textContent=abonnes.length+' abonné'+(abonnes.length>1?'s':'');
+  if(!abonnes.length){list.innerHTML='';empty.style.display='block';return}
+  empty.style.display='none';
+  const sorted=[...abonnes].sort((a,b)=>b.id-a.id);
+  list.innerHTML=sorted.map(a=>`<div class="abonne-item"><span class="abonne-email">${esc(a.email)}</span><span class="abonne-date">${fmtDate(a.id)}</span></div>`).join('');
+}
+function exportEmails(){
+  if(!abonnes.length){alert('Aucun abonné.');return}
+  const emails=abonnes.map(a=>a.email).join('\n');
+  const blob=new Blob([emails],{type:'text/plain'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='abonnes_alpestyle74.txt';a.click();
+}
+function copyEmailDraft(){
+  const sujet=document.getElementById('nl-sujet').value;
+  const msg=document.getElementById('nl-message').value;
+  const emails=abonnes.map(a=>a.email).join(', ');
+  const draft=`À: ${emails}\nSujet: ${sujet}\n\n${msg}`;
+  navigator.clipboard.writeText(draft).then(()=>{const m=document.getElementById('nl-copy-ok');m.style.display='block';setTimeout(()=>m.style.display='none',2500)});
+}
+
+// ════════════════════════════════════════════════════════
+// ADMIN — AVIS
+// ════════════════════════════════════════════════════════
+function setStars(n){selectedStars=n;document.querySelectorAll('#star-selector i').forEach((el,i)=>{el.className=i<n?'ti ti-star-filled on':'ti ti-star'})}
+function handleAvisPhoto(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=function(e){compressImage(e.target.result,900,0.75).then(function(c){pendingAvisPhoto=c;document.getElementById('avis-preview').innerHTML=`<div class="img-preview-item"><img src="${c}"><button class="img-preview-remove" onclick="removeAvisPhoto()">×</button></div>`})};
+  r.readAsDataURL(f);input.value='';
+}
+function removeAvisPhoto(){pendingAvisPhoto='';document.getElementById('avis-preview').innerHTML=''}
+async function addAvis(){
+  const avis={id:Date.now(),clientName:document.getElementById('av-name').value.trim(),plat:document.getElementById('av-plat').value,stars:selectedStars,text:document.getElementById('av-text').value.trim(),photo:pendingAvisPhoto};
+  await dbPut('avis',avis);avisList.unshift(avis);
+  clearAvisForm();renderAdminAvisList();
+  const m=document.getElementById('avis-success');m.style.display='block';setTimeout(()=>m.style.display='none',2500);
+}
+function clearAvisForm(){document.getElementById('av-name').value='';document.getElementById('av-text').value='';pendingAvisPhoto='';document.getElementById('avis-preview').innerHTML='';setStars(5)}
+async function deleteAvis(id){if(!confirm('Supprimer ?'))return;await dbDelete('avis',id);avisList=avisList.filter(a=>a.id!==id);renderAdminAvisList()}
+function renderAdminAvisList(){
+  const list=document.getElementById('admin-avis-list'),empty=document.getElementById('empty-avis-admin');
+  if(!avisList.length){list.innerHTML='';empty.style.display='block';return}
+  empty.style.display='none';
+  list.innerHTML=[...avisList].sort((a,b)=>b.id-a.id).map(a=>`<div class="admin-avis-item">
+    <div class="admin-avis-thumb">${a.photo?`<img src="${a.photo}" alt="">`:`<i class="ti ti-star"></i>`}</div>
+    <div class="admin-avis-info"><div style="display:flex;gap:2px">${starsHtml(a.stars,11)}</div><div style="font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--text2)">${esc(a.clientName||'Anonyme')} · ${esc(a.plat)} · ${fmtDate(a.id)}</div>${a.text?`<div style="font-size:11px;color:var(--text2)">"${esc(a.text)}"</div>`:''}</div>
+    <button class="btn-sm danger" onclick="deleteAvis(${a.id})"><i class="ti ti-trash" style="font-size:11px"></i></button>
+  </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// PROFIL
+// ════════════════════════════════════════════════════════
+function loadProfilForm(){
+  document.getElementById('p-name').value=profil.name||'';
+  document.getElementById('p-bio').value=profil.bio||'';
+  document.getElementById('p-phone').value=profil.phone||'';
+  document.getElementById('p-insta').value=profil.insta||'';
+  document.getElementById('p-email').value=profil.email||'';
+  document.getElementById('p-vinted').value=profil.vinted||'';
+  document.getElementById('p-banner').value=profil.banner||'';
+}
+function handleProfilPhoto(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=function(e){compressImage(e.target.result,400,0.80).then(function(c){profil.photo=c})};r.readAsDataURL(f)}
+function saveProfil(){
+  profil.name=document.getElementById('p-name').value.trim()||'AlpeStyle 74';
+  profil.bio=document.getElementById('p-bio').value.trim();
+  profil.phone=document.getElementById('p-phone').value.trim();
+  profil.insta=document.getElementById('p-insta').value.trim();
+  profil.email=document.getElementById('p-email').value.trim();
+  profil.vinted=document.getElementById('p-vinted').value.trim();
+  profil.banner=document.getElementById('p-banner').value.trim();
+  lsSet('as74_profil',profil);
+  const m=document.getElementById('profil-success');m.style.display='block';setTimeout(()=>m.style.display='none',2500);
+}
+function saveCreds(){
+  const u=document.getElementById('new-user').value.trim();
+  const p=document.getElementById('new-pass').value;
+  const p2=document.getElementById('new-pass2').value;
+  const err=document.getElementById('creds-error');err.style.display='none';
+  if(!u||!p){err.textContent='Remplissez tous les champs.';err.style.display='block';return}
+  if(p!==p2){err.textContent='Les mots de passe ne correspondent pas.';err.style.display='block';return}
+  creds={user:u,pass:p};lsSet('as74_creds',creds);
+  ['new-user','new-pass','new-pass2'].forEach(id=>document.getElementById(id).value='');
+  const m=document.getElementById('creds-success');m.style.display='block';setTimeout(()=>m.style.display='none',2500);
+}
+
+// ════════════════════════════════════════════════════════
+// TABS ADMIN
+// ════════════════════════════════════════════════════════
+function switchAdminTab(tab,btn){
+  document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');document.getElementById('tab-'+tab).classList.add('active');
+  if(tab==='avis')renderAdminAvisList();
+  if(tab==='promos')renderAdminPromoList();
+  if(tab==='newsletter')renderAbonnesList();
+  if(tab==='livraison-admin')initAdminMap();
+  if(tab==='reservations')renderResaAdmin();
+}
+
+// ════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeFiche();closeLightbox();closeResa()}
+  if(document.getElementById('fiche-overlay').classList.contains('open')){
+    if(e.key==='ArrowLeft')ficheGalleryNav(-1);
+    if(e.key==='ArrowRight')ficheGalleryNav(1);
+  }
+});
+
+// ════════════════════════════════════════════════════════
+// FORMULAIRE CONTACT — Web3Forms
+// ════════════════════════════════════════════════════════
+async function sendContact(){
+  const email=document.getElementById('ct-email').value.trim();
+  const objet=document.getElementById('ct-objet').value;
+  const message=document.getElementById('ct-message').value.trim();
+  const okEl=document.getElementById('ct-ok');
+  const errEl=document.getElementById('ct-err');
+  const btn=document.getElementById('ct-submit');
+  okEl.style.display='none';errEl.style.display='none';
+  if(!email||!message){errEl.textContent='Veuillez remplir tous les champs.';errEl.style.display='block';return;}
+  btn.disabled=true;btn.textContent='Envoi…';
+  try{
+    const res=await fetch('https://api.web3forms.com/submit',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({
+        access_key:'c710f90f-bdcb-4177-91ed-417e016d337d',
+        subject:'[AlpeStyle74] '+objet,
+        from_name:'AlpeStyle74 Contact',
+        email:email,
+        objet:objet,
+        message:message
+      })
+    });
+    const data=await res.json();
+    if(data.success){
+      okEl.style.display='block';
+      document.getElementById('ct-email').value='';
+      document.getElementById('ct-message').value='';
+    }else{errEl.textContent='Erreur : '+data.message;errEl.style.display='block';}
+  }catch(e){errEl.textContent='Erreur réseau, réessayez.';errEl.style.display='block';}
+  btn.disabled=false;btn.textContent='Envoyer le message';
+}
+
+
+async function loadAllData(){
+  articles = await dbGetAll('articles');
+  articles.sort((a,b)=>b.id-a.id);
+  avisList  = await dbGetAll('avis');
+  promos    = await dbGetAll('promos');
+  promos.sort((a,b)=>b.id-a.id);
+  abonnes   = await dbGetAll('abonnes');
+  setStars(5);
+  renderPublicGrid();
+  renderApropos();
+  updateResaBadge();
+  showSync('✓ Données synchronisées','ok');
+}
+
+async function init(){
+  showSync('Chargement…','saving');
+  try{
+    await loadAllData();
+    initPublicMap();
+  }catch(e){
+    console.error('Erreur init:',e);
+    showSync('Erreur de chargement','err');
+  }
+}
+init();
+
+// ════════════════════════════════════════════════════════
+// CARTE LEAFLET — publique + admin modifiable
+// ════════════════════════════════════════════════════════
+let _pubMap=null, _adminMap=null, _adminPolygon=null, _adminMarkers=[], _adminPoints=[];
+const ANNECY=[45.8992,6.1294];
+const DEFAULT_ZONE=[[45.97,6.05],[45.97,6.22],[45.83,6.22],[45.83,6.05]];
+
+async function initPublicMap(){
+  const el=document.getElementById('livraison-map');
+  if(!el||_pubMap)return;
+  _pubMap=L.map('livraison-map',{zoomControl:true,scrollWheelZoom:false}).setView(ANNECY,11);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:18}).addTo(_pubMap);
+  const saved=await dbGetConfig('delivery_zone');
+  const pts=saved&&saved.length?saved:DEFAULT_ZONE;
+  L.polygon(pts,{color:'#1a1814',fillColor:'#1a1814',fillOpacity:0.1,weight:1.5,dashArray:'6,4'}).addTo(_pubMap);
+  L.circleMarker(ANNECY,{radius:7,color:'#1a1814',fillColor:'#1a1814',fillOpacity:1,weight:2}).addTo(_pubMap).bindPopup('<b>AlpeStyle74</b><br>Annecy — Haute-Savoie');
+}
+
+function initAdminMap(){
+  if(_adminMap)return;
+  setTimeout(async()=>{
+    const el=document.getElementById('admin-map');
+    if(!el)return;
+    _adminMap=L.map('admin-map',{zoomControl:true}).setView(ANNECY,11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:18}).addTo(_adminMap);
+    const saved=await dbGetConfig('delivery_zone');
+    _adminPoints=saved&&saved.length?saved.map(p=>[...p]):[...DEFAULT_ZONE.map(p=>[...p])];
+    drawAdminPolygon();
+    _adminMap.on('click',e=>{
+      _adminPoints.push([e.latlng.lat,e.latlng.lng]);
+      drawAdminPolygon();
+    });
+  },200);
+}
+
+function drawAdminPolygon(){
+  if(!_adminMap)return;
+  _adminMarkers.forEach(m=>_adminMap.removeLayer(m));
+  _adminMarkers=[];
+  if(_adminPolygon)_adminMap.removeLayer(_adminPolygon);
+  if(_adminPoints.length>2){
+    _adminPolygon=L.polygon(_adminPoints,{color:'#1a1814',fillColor:'#1a1814',fillOpacity:0.12,weight:2,dashArray:'6,4'}).addTo(_adminMap);
+  }
+  _adminPoints.forEach((pt,i)=>{
+    const m=L.circleMarker(pt,{radius:7,color:'#1a1814',fillColor:'#fff',fillOpacity:1,weight:2}).addTo(_adminMap);
+    m.bindTooltip(`Point ${i+1}`,{permanent:false});
+    m.on('dblclick',()=>{_adminPoints.splice(i,1);drawAdminPolygon();});
+    let dragging=false;
+    m.on('mousedown',()=>{
+      dragging=true;
+      _adminMap.dragging.disable();
+      _adminMap.on('mousemove',ev=>{if(dragging){_adminPoints[i]=[ev.latlng.lat,ev.latlng.lng];m.setLatLng(ev.latlng);}});
+      _adminMap.on('mouseup',()=>{dragging=false;_adminMap.dragging.enable();drawAdminPolygon();});
+    });
+    _adminMarkers.push(m);
+  });
+}
+
+async function saveDeliveryZone(){
+  await dbSetConfig('delivery_zone',_adminPoints);
+  const msg=document.getElementById('zone-save-msg');
+  msg.style.display='block';
+  setTimeout(()=>msg.style.display='none',2500);
+  // Reset la carte publique pour recharger
+  if(_pubMap){_pubMap.remove();_pubMap=null;}
+}
+
+function resetDeliveryZone(){
+  _adminPoints=[...DEFAULT_ZONE.map(p=>[...p])];
+  drawAdminPolygon();
+}
+
+</script>
+<!-- BOUTON RETOUR EN HAUT -->
+<button class="back-to-top" id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Retour en haut">
+  <i class="ti ti-arrow-up"></i>
+</button>
+
+<!-- FOOTER MENTIONS LÉGALES -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-title">Mentions légales</div>
+        <div class="footer-text">
+          <strong>Éditeur</strong> — AlpeStyle74, particulier non professionnel, Haute-Savoie (74), France<br>
+          <strong>Hébergement</strong> — Vercel Inc., San Francisco, USA · Base de données Supabase<br>
+          <strong>Dernière modification</strong> — Juin 2025
+        </div>
+      </div>
+      <div>
+        <div class="footer-title">Informations</div>
+        <div class="footer-text">
+          Vente entre particuliers. Paiement et livraison convenus directement via WhatsApp ou email. La vente entre particuliers n'est pas soumise au droit de rétractation de 14 jours. Tout retour est à convenir avec le vendeur.
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="footer-title">Données personnelles (RGPD)</div>
+      <div class="footer-text">Les emails collectés via la newsletter ne sont jamais revendus. Suppression sur simple demande.</div>
+    </div>
+    <div class="footer-bottom">© 2025 AlpeStyle74 · Haute-Savoie · Tous droits réservés</div>
+  </div>
+</footer>
+
+</body>
+</html>
